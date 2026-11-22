@@ -34,6 +34,8 @@ CLI-only program with no dependencies at all.
 
 ## Preview
 
+![Preview](docs/screenshots/preview.png)
+
 Select a playlist (or a stream file in the middle list) and press **Play List** / **Play Clip**, double-click a row, or use **Play File...** to open any video file. The video plays in a preview window with seek, volume, and audio/subtitle choice. Playlists go through mpv's `bd://` protocol, so encrypted discs decrypt the same way as the scan (libbluray + MakeMKV's libmmbd).
 
 The preview needs libmpv at run time (Debian/Ubuntu: `sudo apt install libmpv2`); it is loaded on first use, adds about 60 KB to the executable, and the rest of TuxInfo works without it. Build without it using `--no-default-features --features gui,bluray`.
