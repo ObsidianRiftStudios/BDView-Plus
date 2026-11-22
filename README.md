@@ -24,6 +24,8 @@ TuxInfo is written in Rust and is based on [BDInfo](https://github.com/UniqProje
   right away instead of scanning again.
 - **Preview.** Play a playlist, a single clip, or any video file in a built-in player with seeking, volume, and
   audio and subtitle selection.
+- **Your layout, your way.** Switch between light and dark mode, change the text size, and drag the dividers
+  between the lists to resize them. The report, bitrate charts, and preview open in their own windows, so you can move them next to the main window or onto another monitor.
 - **Encrypted discs.** Reads protected discs through libbluray, with optional MakeMKV support.
 
 ![Bit rate chart](docs/screenshots/bitrate-chart.png)
