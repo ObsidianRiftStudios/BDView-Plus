@@ -1,5 +1,10 @@
 # TuxInfo
 
+![Rust](https://img.shields.io/badge/Written%20in-Rust-orange?logo=rust&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Linux-blue?logo=linux&logoColor=white)
+![Debian](https://img.shields.io/badge/Debian-13-A81D33?logo=debian&logoColor=white)
+![License](https://img.shields.io/badge/License-LGPL--2.1--or--later-green)
+
 **Blu-ray and Ultra HD disc analyzer for Linux.**
 
 By [Obsidian Rift Studios](https://github.com/ObsidianRiftStudios)
