@@ -2,6 +2,8 @@
 
 **Blu-ray and Ultra HD disc analyzer for Linux.**
 
+By [Obsidian Rift Studios](https://github.com/ObsidianRiftStudios)
+
 TuxInfo shows you what is really on a Blu-ray or 4K UHD disc: every playlist, the video, audio and subtitle
 streams inside it, and the measured bit rate of each one. It can draw bit rate charts, produce a text report
 you can copy or save, and play a preview of any playlist or clip. It works on a disc in a drive, an ISO image,
@@ -24,8 +26,6 @@ TuxInfo is written in Rust and is based on [BDInfo](https://github.com/UniqProje
   right away instead of scanning again.
 - **Preview.** Play a playlist, a single clip, or any video file in a built-in player with seeking, volume, and
   audio and subtitle selection.
-- **Your layout, your way.** Switch between light and dark mode, change the text size, and drag the dividers
-  between the lists to resize them. The report, bitrate charts, and preview open in their own windows, so you can move them next to the main window or onto another monitor.
 - **Encrypted discs.** Reads protected discs through libbluray, with optional MakeMKV support.
 
 ![Bit rate chart](docs/screenshots/bitrate-chart.png)
@@ -36,7 +36,7 @@ TuxInfo is written in Rust and is based on [BDInfo](https://github.com/UniqProje
 
 ## Installing
 
-Download the latest `.deb` from the [Releases](https://github.com/digitalMedic/TuxInfo/releases) page and install it:
+Download the latest `.deb` from the [Releases](https://github.com/ObsidianRiftStudios/TuxInfo/releases) page and install it:
 
 ```
 sudo apt install ./tuxinfo_1.0.0_amd64.deb
@@ -119,6 +119,11 @@ packaging/build-deb.sh
 
 The finished package is written to `target/`.
 
+## Support
+
+Found a bug or have an idea? Open an [issue](https://github.com/ObsidianRiftStudios/TuxInfo/issues) on GitHub, or email
+[support@obsidianrift.net](mailto:support@obsidianrift.net).
+
 ## Good to know
 
 - TuxInfo reads Blu-ray and Ultra HD discs, from a drive, an ISO image or a folder. Blu-ray 3D is not supported.
@@ -128,7 +133,7 @@ The finished package is written to `target/`.
 
 ## License and credits
 
-TuxInfo is released under the LGPL-2.1-or-later license (see `LICENSE`).
+TuxInfo is released by Obsidian Rift Studios under the LGPL-2.1-or-later license (see `LICENSE`).
 
 It is based on BDInfo by Cinema Squid, continued by the UniqProject developers, which is also LGPL-2.1.
 Disc reading uses libbluray and MakeMKV's libmmbd, the preview uses libmpv, and the window is drawn with egui.

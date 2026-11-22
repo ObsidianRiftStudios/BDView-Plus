@@ -1600,12 +1600,14 @@ impl eframe::App for App {
                         ui.label(RichText::new("TuxInfo").strong().size(32.0));
                         ui.label(RichText::new(format!("Version {}", crate::app_info::version())).size(15.0));
                         ui.label(RichText::new("Blu-ray and Ultra HD disc analyzer").weak());
+                        ui.label(RichText::new(format!("by {}", crate::app_info::STUDIO)).weak());
                         ui.add_space(8.0);
                         if has_repo {
                             ui.hyperlink_to(crate::app_info::REPO_URL, crate::app_info::REPO_URL);
                         } else {
                             ui.label(RichText::new("The repository address will be added here.").weak());
                         }
+                        ui.hyperlink_to(crate::app_info::SUPPORT_EMAIL, format!("mailto:{}", crate::app_info::SUPPORT_EMAIL));
                     });
                     ui.vertical(|ui| {
                         ui.add_space(PAD);

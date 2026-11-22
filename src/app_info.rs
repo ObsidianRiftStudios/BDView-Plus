@@ -1,7 +1,11 @@
 //! Program identity, repository address and the update check (std only; the check runs `curl`).
 
 /// Home of the TuxInfo repository, e.g. "https://github.com/OWNER/tuxinfo". Empty until it is known.
-pub const REPO_URL: &str = "https://github.com/digitalMedic/TuxInfo";
+pub const REPO_URL: &str = "https://github.com/ObsidianRiftStudios/TuxInfo";
+
+/// Developer name and support address shown in the About window.
+pub const STUDIO: &str = "Obsidian Rift Studios";
+pub const SUPPORT_EMAIL: &str = "support@obsidianrift.net";
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
