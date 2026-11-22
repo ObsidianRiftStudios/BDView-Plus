@@ -23,8 +23,16 @@ pub struct Slice {
 
 pub enum Kind {
     /// (minutes, value) points of the three curves.
-    Lines { min: Vec<[f64; 2]>, avg: Vec<[f64; 2]>, max: Vec<[f64; 2]> },
-    Bars { labels: Vec<String>, avg: Vec<f64>, peak: Vec<f64> },
+    Lines {
+        min: Vec<[f64; 2]>,
+        avg: Vec<[f64; 2]>,
+        max: Vec<[f64; 2]>,
+    },
+    Bars {
+        labels: Vec<String>,
+        avg: Vec<f64>,
+        peak: Vec<f64>,
+    },
     Pie(Vec<Slice>),
 }
 
@@ -44,7 +52,17 @@ pub fn build(d: &Disc, pl: &Playlist, kind: usize, pid: u16, angle: usize) -> Ch
     let ty = TYPES[kind.min(TYPES.len() - 1)];
     let label = d.label.replace(' ', "_");
     let stem = pl.name.rsplit_once('.').map_or(pl.name.as_str(), |x| x.0);
-    let file = format!("{label}-{stem}-{}.png", ["bitrate-01s", "bitrate-05s", "bitrate-10s", "frame-size", "frame-type-count", "frame-type-size"][kind.min(5)]);
+    let file = format!(
+        "{label}-{stem}-{}.png",
+        [
+            "bitrate-01s",
+            "bitrate-05s",
+            "bitrate-10s",
+            "frame-size",
+            "frame-type-count",
+            "frame-type-size"
+        ][kind.min(5)]
+    );
     let total = pl.total_length();
     let mut c = Chart {
         title: ty.to_string(),
@@ -78,8 +96,16 @@ pub fn has_data(d: &Disc, pl: &Playlist, pid: u16, angle: usize) -> bool {
 }
 
 /// The diagnostics of every clip of the chosen angle, with the clip they belong to.
-fn clips<'a>(d: &'a Disc, pl: &'a Playlist, pid: u16, angle: usize) -> impl Iterator<Item = (&'a crate::disc::Clip, &'a Vec<crate::disc::Diag>)> {
-    pl.clips.iter().filter(move |c| c.angle == angle).filter_map(move |c| Some((c, d.files.get(&c.name)?.diag.get(&pid)?)))
+fn clips<'a>(
+    d: &'a Disc,
+    pl: &'a Playlist,
+    pid: u16,
+    angle: usize,
+) -> impl Iterator<Item = (&'a crate::disc::Clip, &'a Vec<crate::disc::Diag>)> {
+    pl.clips
+        .iter()
+        .filter(move |c| c.angle == angle)
+        .filter_map(move |c| Some((c, d.files.get(&c.name)?.diag.get(&pid)?)))
 }
 
 /// Shared "one point per second" bookkeeping of the original (min / avg / max curves).
@@ -96,7 +122,16 @@ struct Points {
 
 impl Points {
     fn new() -> Self {
-        Points { min: vec![], avg: vec![], max: vec![], sec: 1.0, pmin: f64::MAX, pmax: 0.0, pavg: 0.0, count: 0 }
+        Points {
+            min: vec![],
+            avg: vec![],
+            max: vec![],
+            sec: 1.0,
+            pmin: f64::MAX,
+            pmax: 0.0,
+            pavg: 0.0,
+            count: 0,
+        }
     }
     fn zero(&mut self, x: f64) {
         let px = (x - 1.0) / 60.0;
@@ -132,7 +167,11 @@ impl Points {
             self.zero(x);
             x += 1.0;
         }
-        Kind::Lines { min: self.min, avg: self.avg, max: self.max }
+        Kind::Lines {
+            min: self.min,
+            avg: self.avg,
+            max: self.max,
+        }
     }
 }
 
@@ -208,7 +247,11 @@ fn frame_types(d: &Disc, pl: &Playlist, pid: u16, angle: usize, sizes: bool, c: 
     if sizes {
         c.unit = "KB";
         c.yt = "Average / Peak Size (KB)".into();
-        c.kind = Kind::Bars { labels: t.iter().map(|x| x.0.clone()).collect(), avg: t.iter().map(|x| x.2 / x.1).collect(), peak: t.iter().map(|x| x.3).collect() };
+        c.kind = Kind::Bars {
+            labels: t.iter().map(|x| x.0.clone()).collect(),
+            avg: t.iter().map(|x| x.2 / x.1).collect(),
+            peak: t.iter().map(|x| x.3).collect(),
+        };
         return;
     }
     c.yt = "Count".into();
@@ -248,7 +291,10 @@ pub struct View {
 
 impl View {
     pub fn new(c: &Chart) -> View {
-        View { x0: 0.0, x1: c.total_min.max(1e-6) }
+        View {
+            x0: 0.0,
+            x1: c.total_min.max(1e-6),
+        }
     }
 }
 
@@ -262,11 +308,27 @@ fn nice_step(range: f64, target: f64) -> f64 {
     let raw = (range / target).max(1e-12);
     let mag = 10f64.powf(raw.log10().floor());
     let f = raw / mag;
-    mag * if f <= 1.0 { 1.0 } else if f <= 2.0 { 2.0 } else if f <= 5.0 { 5.0 } else { 10.0 }
+    mag * if f <= 1.0 {
+        1.0
+    } else if f <= 2.0 {
+        2.0
+    } else if f <= 5.0 {
+        5.0
+    } else {
+        10.0
+    }
 }
 
 fn fmt_tick(v: f64, step: f64) -> String {
-    if step >= 1.0 { format!("{v:.0}") } else if step >= 0.1 { format!("{v:.1}") } else if step >= 0.01 { format!("{v:.2}") } else { format!("{v:.3}") }
+    if step >= 1.0 {
+        format!("{v:.0}")
+    } else if step >= 0.1 {
+        format!("{v:.1}")
+    } else if step >= 0.01 {
+        format!("{v:.2}")
+    } else {
+        format!("{v:.3}")
+    }
 }
 
 const GRID: Color32 = Color32::from_gray(222);
@@ -279,9 +341,22 @@ pub fn draw(ui: &mut egui::Ui, ch: &Chart, view: &mut View) -> Drawn {
     p.rect_filled(rect, 0.0, Color32::WHITE);
     let f = FontId::proportional(13.0);
     let title_f = FontId::proportional(17.0);
-    p.text(Pos2::new(rect.center().x, rect.top() + 8.0), Align2::CENTER_TOP, &ch.title, title_f, INK);
+    p.text(
+        Pos2::new(rect.center().x, rect.top() + 8.0),
+        Align2::CENTER_TOP,
+        &ch.title,
+        title_f,
+        INK,
+    );
     let pie = matches!(ch.kind, Kind::Pie(_));
-    let cr = if pie { rect.shrink2(egui::vec2(20.0, 44.0)) } else { Rect::from_min_max(Pos2::new(rect.left() + 66.0, rect.top() + 40.0), Pos2::new(rect.right() - 66.0, rect.bottom() - 46.0)) };
+    let cr = if pie {
+        rect.shrink2(egui::vec2(20.0, 44.0))
+    } else {
+        Rect::from_min_max(
+            Pos2::new(rect.left() + 66.0, rect.top() + 40.0),
+            Pos2::new(rect.right() - 66.0, rect.bottom() - 46.0),
+        )
+    };
     let hover = resp.hover_pos().filter(|h| cr.contains(*h));
     let mut status = String::new();
     if cr.width() < 50.0 || cr.height() < 50.0 {
@@ -332,7 +407,13 @@ pub fn draw(ui: &mut egui::Ui, ch: &Chart, view: &mut View) -> Drawn {
             while x <= x1 + 1e-9 {
                 let px = tx(x);
                 p.vline(px, cr.top()..=cr.bottom(), Stroke::new(1.0, GRID));
-                p.text(Pos2::new(px, cr.bottom() + 4.0), Align2::CENTER_TOP, fmt_tick(x, xstep), f.clone(), INK);
+                p.text(
+                    Pos2::new(px, cr.bottom() + 4.0),
+                    Align2::CENTER_TOP,
+                    fmt_tick(x, xstep),
+                    f.clone(),
+                    INK,
+                );
                 x += xstep;
             }
             let mut y = 0.0;
@@ -396,9 +477,22 @@ pub fn draw(ui: &mut egui::Ui, ch: &Chart, view: &mut View) -> Drawn {
             if let Some(h) = hover {
                 let xm = x0 + ((h.x - cr.left()) / cr.width()) as f64 * (x1 - x0);
                 let yv = (cr.bottom() - h.y) as f64 / cr.height() as f64 * ymax;
-                p.vline(h.x, cr.top()..=cr.bottom(), Stroke::new(1.0, Color32::from_rgba_unmultiplied(0, 0, 0, 70)));
+                p.vline(
+                    h.x,
+                    cr.top()..=cr.bottom(),
+                    Stroke::new(1.0, Color32::from_rgba_unmultiplied(0, 0, 0, 70)),
+                );
                 let ms = (xm * 60_000.0).round().max(0.0) as u64;
-                status = format!("Time: {:.3} sec ({:02}:{:02}:{:02}.{:02})   Value: {:.2} {}", xm * 60.0, ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000, yv, ch.unit);
+                status = format!(
+                    "Time: {:.3} sec ({:02}:{:02}:{:02}.{:02})   Value: {:.2} {}",
+                    xm * 60.0,
+                    ms / 3_600_000,
+                    ms / 60_000 % 60,
+                    ms / 1000 % 60,
+                    ms % 1000,
+                    yv,
+                    ch.unit
+                );
             }
         }
         Kind::Bars { labels, avg, peak } => {
@@ -409,7 +503,13 @@ pub fn draw(ui: &mut egui::Ui, ch: &Chart, view: &mut View) -> Drawn {
             let mut y = 0.0;
             while y <= ymax + 1e-9 {
                 p.hline(cr.left()..=cr.right(), ty(y), Stroke::new(1.0, GRID));
-                p.text(Pos2::new(cr.left() - 6.0, ty(y)), Align2::RIGHT_CENTER, fmt_tick(y, ystep), f.clone(), INK);
+                p.text(
+                    Pos2::new(cr.left() - 6.0, ty(y)),
+                    Align2::RIGHT_CENTER,
+                    fmt_tick(y, ystep),
+                    f.clone(),
+                    INK,
+                );
                 y += ystep;
             }
             let n = labels.len().max(1);
@@ -421,14 +521,31 @@ pub fn draw(ui: &mut egui::Ui, ch: &Chart, view: &mut View) -> Drawn {
                 let k = Rect::from_min_max(Pos2::new(cx, ty(peak[i])), Pos2::new(cx + bw, cr.bottom()));
                 p.rect_filled(a, 0.0, Color32::BLACK);
                 p.rect_stroke(k, 0.0, Stroke::new(1.5, Color32::BLACK), egui::StrokeKind::Inside);
-                p.text(Pos2::new(a.center().x, a.top() - 2.0), Align2::CENTER_BOTTOM, format!("{:.0}", avg[i]), f.clone(), INK);
-                p.text(Pos2::new(k.center().x, k.top() - 2.0), Align2::CENTER_BOTTOM, format!("{:.0}", peak[i]), f.clone(), INK);
+                p.text(
+                    Pos2::new(a.center().x, a.top() - 2.0),
+                    Align2::CENTER_BOTTOM,
+                    format!("{:.0}", avg[i]),
+                    f.clone(),
+                    INK,
+                );
+                p.text(
+                    Pos2::new(k.center().x, k.top() - 2.0),
+                    Align2::CENTER_BOTTOM,
+                    format!("{:.0}", peak[i]),
+                    f.clone(),
+                    INK,
+                );
                 p.text(Pos2::new(cx, cr.bottom() + 4.0), Align2::CENTER_TOP, l, f.clone(), INK);
             }
             let (lx, ly) = (cr.right() - 110.0, cr.top() + 10.0);
             p.rect_filled(Rect::from_min_size(Pos2::new(lx, ly), egui::vec2(14.0, 12.0)), 0.0, Color32::BLACK);
             p.text(Pos2::new(lx + 20.0, ly + 6.0), Align2::LEFT_CENTER, "Average", f.clone(), INK);
-            p.rect_stroke(Rect::from_min_size(Pos2::new(lx, ly + 18.0), egui::vec2(14.0, 12.0)), 0.0, Stroke::new(1.5, Color32::BLACK), egui::StrokeKind::Inside);
+            p.rect_stroke(
+                Rect::from_min_size(Pos2::new(lx, ly + 18.0), egui::vec2(14.0, 12.0)),
+                0.0,
+                Stroke::new(1.5, Color32::BLACK),
+                egui::StrokeKind::Inside,
+            );
             p.text(Pos2::new(lx + 20.0, ly + 24.0), Align2::LEFT_CENTER, "Peak", f.clone(), INK);
         }
         Kind::Pie(slices) => {
@@ -467,14 +584,26 @@ pub fn draw(ui: &mut egui::Ui, ch: &Chart, view: &mut View) -> Drawn {
     }
     if !pie {
         p.rect_stroke(cr, 0.0, Stroke::new(1.0, Color32::from_gray(60)), egui::StrokeKind::Inside);
-        p.text(Pos2::new(cr.center().x, rect.bottom() - 6.0), Align2::CENTER_BOTTOM, &ch.xt, f.clone(), INK);
+        p.text(
+            Pos2::new(cr.center().x, rect.bottom() - 6.0),
+            Align2::CENTER_BOTTOM,
+            &ch.xt,
+            f.clone(),
+            INK,
+        );
         let g = p.layout_no_wrap(ch.yt.clone(), f.clone(), INK);
         let w = g.size().x;
-        p.add(egui::epaint::TextShape::new(Pos2::new(rect.left() + 6.0, cr.center().y + w / 2.0), g, INK).with_angle(-std::f32::consts::FRAC_PI_2));
+        p.add(
+            egui::epaint::TextShape::new(Pos2::new(rect.left() + 6.0, cr.center().y + w / 2.0), g, INK)
+                .with_angle(-std::f32::consts::FRAC_PI_2),
+        );
         if matches!(ch.kind, Kind::Lines { .. }) {
             let g = p.layout_no_wrap(ch.yt.clone(), f.clone(), INK);
             let w = g.size().x;
-            p.add(egui::epaint::TextShape::new(Pos2::new(rect.right() - 20.0, cr.center().y + w / 2.0), g, INK).with_angle(-std::f32::consts::FRAC_PI_2));
+            p.add(
+                egui::epaint::TextShape::new(Pos2::new(rect.right() - 20.0, cr.center().y + w / 2.0), g, INK)
+                    .with_angle(-std::f32::consts::FRAC_PI_2),
+            );
         }
     }
     Drawn { rect, status }

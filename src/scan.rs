@@ -63,20 +63,36 @@ fn pass(
 ) -> bool {
     // The quick pass reads only the start of each file, so its progress counts files (in 1000ths)
     // rather than bytes; the full pass counts bytes.
-    let total: u64 = if full { names.iter().map(|n| disc.files[n].size).sum() } else { names.len() as u64 * 1000 };
+    let total: u64 = if full {
+        names.iter().map(|n| disc.files[n].size).sum()
+    } else {
+        names.len() as u64 * 1000
+    };
     let mut done = 0u64;
     for name in names {
         let mut f = disc.files.remove(name).unwrap();
         let mine: Vec<usize> = if full {
-            sel.iter().copied().filter(|&i| disc.playlists[i].clips.iter().any(|c| &c.name == name)).collect()
+            sel.iter()
+                .copied()
+                .filter(|&i| disc.playlists[i].clips.iter().any(|c| &c.name == name))
+                .collect()
         } else {
             Vec::new()
         };
         let (base, size) = (done, f.size);
         let mut cancelled = false;
         let r = ts::scan_file(&mut f, &mut disc.playlists, &mine, full, &mut |b| {
-            let d = if full { base + b } else { base + (b * 1000 / ts::QUICK_CAP).min(999) };
-            let keep = on(&Progress { label, file: name, done: d, total });
+            let d = if full {
+                base + b
+            } else {
+                base + (b * 1000 / ts::QUICK_CAP).min(999)
+            };
+            let keep = on(&Progress {
+                label,
+                file: name,
+                done: d,
+                total,
+            });
             cancelled |= !keep;
             keep
         });
@@ -90,6 +106,11 @@ fn pass(
             warnings.push(format!("{name}\t{e}"));
         }
     }
-    on(&Progress { label, file: "", done: total, total });
+    on(&Progress {
+        label,
+        file: "",
+        done: total,
+        total,
+    });
     true
 }

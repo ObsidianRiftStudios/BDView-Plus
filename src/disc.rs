@@ -2,8 +2,8 @@
 //! (ports of BDROM.cs, TSStreamClipFile.cs and TSPlaylistFile.cs).
 
 use crate::stream::*;
-use std::collections::{HashMap, HashSet};
 use crate::vfs::{self, Node};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -83,12 +83,20 @@ impl Playlist {
     }
     pub fn total_bitrate(&self) -> u64 {
         let l = self.total_length();
-        if l > 0.0 { rnd(self.total_size() as f64 * 8.0 / l) as u64 } else { 0 }
+        if l > 0.0 {
+            rnd(self.total_size() as f64 * 8.0 / l) as u64
+        } else {
+            0
+        }
     }
     /// Streams in report order: video, audio, graphics, text.
     pub fn sorted(&self) -> Vec<&Stream> {
         let f = |p: fn(&Stream) -> bool| self.streams.list.iter().filter(move |s| p(s));
-        f(Stream::is_video).chain(f(Stream::is_audio)).chain(f(Stream::is_graphics)).chain(f(Stream::is_text)).collect()
+        f(Stream::is_video)
+            .chain(f(Stream::is_audio))
+            .chain(f(Stream::is_graphics))
+            .chain(f(Stream::is_text))
+            .collect()
     }
     pub fn detect_loops(&self) -> bool {
         let mut seen: HashMap<&str, Vec<f64>> = HashMap::new();
@@ -132,9 +140,7 @@ impl Playlist {
             if !self.clips[r].has_file && c.has_file {
                 r = i;
             }
-            if n(c) > n(&self.clips[r]) && c.rel_length > 0.01 {
-                r = i;
-            } else if c.length > self.clips[r].length && c.has_file {
+            if (n(c) > n(&self.clips[r]) && c.rel_length > 0.01) || (c.length > self.clips[r].length && c.has_file) {
                 r = i;
             }
         }
@@ -185,10 +191,24 @@ impl Playlist {
             }
         }
         // The Dolby Vision layer carries no HDR SEI of its own; show it with the base layer's colour and mastering text
-        let base = self.streams.list.iter().find(|s| s.stype == HEVC_VIDEO && s.pid < 4117 && !s.ext_info.is_empty()).map(|s| s.ext_info.clone());
+        let base = self
+            .streams
+            .list
+            .iter()
+            .find(|s| s.stype == HEVC_VIDEO && s.pid < 4117 && !s.ext_info.is_empty())
+            .map(|s| s.ext_info.clone());
         if let Some(base) = base {
-            for s in self.streams.list.iter_mut().filter(|s| s.stype == HEVC_VIDEO && s.pid >= 4117 && !s.ext_info.is_empty()) {
-                let mut e: Vec<String> = base.iter().filter(|x| !x.starts_with("HDR10") && x.as_str() != "HLG").cloned().collect();
+            for s in self
+                .streams
+                .list
+                .iter_mut()
+                .filter(|s| s.stype == HEVC_VIDEO && s.pid >= 4117 && !s.ext_info.is_empty())
+            {
+                let mut e: Vec<String> = base
+                    .iter()
+                    .filter(|x| !x.starts_with("HDR10") && x.as_str() != "HLG")
+                    .cloned()
+                    .collect();
                 if let Some(i) = e.iter().position(|x| x.ends_with(" bits")) {
                     e.insert(i + 1, "Dolby Vision".into());
                 }
@@ -224,12 +244,20 @@ pub struct Disc {
 }
 
 pub fn find_ci(dir: &Path, name: &str) -> Option<PathBuf> {
-    fs::read_dir(dir).ok()?.flatten().find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name)).map(|e| e.path())
+    fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        .map(|e| e.path())
 }
 
 fn list_ext(dir: &Node, ext: &str) -> Vec<Node> {
     let dot = format!(".{ext}");
-    let mut v: Vec<Node> = dir.children().into_iter().filter(|n| !n.is_dir && n.name.to_lowercase().ends_with(&dot)).collect();
+    let mut v: Vec<Node> = dir
+        .children()
+        .into_iter()
+        .filter(|n| !n.is_dir && n.name.to_lowercase().ends_with(&dot))
+        .collect();
     v.sort_by(|a, b| a.name.cmp(&b.name));
     v
 }
@@ -238,7 +266,11 @@ fn list_ext(dir: &Node, ext: &str) -> Vec<Node> {
 /// `find DIR -type f -printf '%s %P\n' | sort -k2`), to compare against another tool's listing.
 fn list_files(d: &Node, prefix: &str, out: &mut Vec<String>) {
     for c in d.children() {
-        let p = if prefix.is_empty() { c.name.clone() } else { format!("{prefix}/{}", c.name) };
+        let p = if prefix.is_empty() {
+            c.name.clone()
+        } else {
+            format!("{prefix}/{}", c.name)
+        };
         if c.is_dir {
             list_files(&c, &p, out);
         } else {
@@ -248,7 +280,18 @@ fn list_files(d: &Node, prefix: &str, out: &mut Vec<String>) {
 }
 
 fn dir_size(d: &Node) -> u64 {
-    d.children().iter().map(|c| if !c.is_dir { c.size } else if c.name.eq_ignore_ascii_case("SSIF") { 0 } else { dir_size(c) }).sum()
+    d.children()
+        .iter()
+        .map(|c| {
+            if !c.is_dir {
+                c.size
+            } else if c.name.eq_ignore_ascii_case("SSIF") {
+                0
+            } else {
+                dir_size(c)
+            }
+        })
+        .sum()
 }
 
 fn i16be(d: &[u8], p: usize) -> usize {
@@ -294,7 +337,11 @@ fn ep_map(d: &[u8]) -> Vec<(u64, u64)> {
         }
         let m = cpi + 6; // EP_map follows the CPI length (4) and type (2)
         let n = *d.get(m + 1)? as usize;
-        let e = m + 2 + 12 * (0..n).find(|&i| d.get(m + 2 + 12 * i + 3).is_some_and(|b| (b >> 2) & 0xF == 1)).unwrap_or(0);
+        let e = m
+            + 2
+            + 12 * (0..n)
+                .find(|&i| d.get(m + 2 + 12 * i + 3).is_some_and(|b| (b >> 2) & 0xF == 1))
+                .unwrap_or(0);
         let w = u32at(e + 2)?;
         let (coarse_n, fine_n) = ((w >> 2) & 0xFFFF, ((w & 3) << 16) | u16at(e + 6)?);
         let sec = m + u32at(e + 8)?;
@@ -330,7 +377,7 @@ impl Disc {
         // start at the last entry point at or before the in time, end at the first one at or after the out time
         let start = ep.iter().rev().find(|e| e.0 <= tin).map_or(0, |e| e.1);
         let end = ep.iter().find(|e| e.0 >= tout).map_or(f.size, |e| e.1);
-        let (start, end) = (start / U * U, (end.min(f.size) + U - 1) / U * U);
+        let (start, end) = (start / U * U, end.min(f.size).div_ceil(U) * U);
         (end > start).then_some(Seg { name, start, end })
     }
 }
@@ -355,7 +402,10 @@ pub fn parse_clpi(d: &[u8]) -> Result<StreamSet, String> {
         off += 2;
         let t = c[off + 1];
         let mut s = None;
-        let lang = |p: usize| c.get(off + p..off + p + 3).map(|b| b.iter().map(|&x| x as char).collect::<String>());
+        let lang = |p: usize| {
+            c.get(off + p..off + p + 3)
+                .map(|b| b.iter().map(|&x| x as char).collect::<String>())
+        };
         match t {
             HEVC_VIDEO | AVC_VIDEO | MPEG1_VIDEO | MPEG2_VIDEO | VC1_VIDEO => {
                 let mut v = Stream::new(pid, t);
@@ -364,8 +414,8 @@ pub fn parse_clpi(d: &[u8]) -> Result<StreamSet, String> {
                 v.aspect = c[off + 3] >> 4;
                 s = Some(v);
             }
-            AC3_AUDIO | AC3_PLUS_AUDIO | AC3_PLUS_SECONDARY | TRUEHD_AUDIO | DTS_AUDIO | DTS_HD_AUDIO
-            | DTS_HD_MASTER_AUDIO | DTS_HD_SECONDARY | LPCM_AUDIO | MPEG1_AUDIO | MPEG2_AUDIO | MPEG2_AAC | MPEG4_AAC => {
+            AC3_AUDIO | AC3_PLUS_AUDIO | AC3_PLUS_SECONDARY | TRUEHD_AUDIO | DTS_AUDIO | DTS_HD_AUDIO | DTS_HD_MASTER_AUDIO
+            | DTS_HD_SECONDARY | LPCM_AUDIO | MPEG1_AUDIO | MPEG2_AUDIO | MPEG2_AAC | MPEG4_AAC => {
                 let mut a = Stream::new(pid, t);
                 a.layout = c[off + 2] >> 4;
                 a.sample_rate = Stream::convert_sample_rate(c[off + 2] & 0xF);
@@ -408,9 +458,27 @@ fn playlist_stream(d: &[u8], pos: &mut usize) -> Option<u16> {
     *pos = sp + sl;
     let known = matches!(
         d[sp],
-        HEVC_VIDEO | AVC_VIDEO | MPEG1_VIDEO | MPEG2_VIDEO | VC1_VIDEO | AC3_AUDIO | AC3_PLUS_AUDIO | AC3_PLUS_SECONDARY
-            | TRUEHD_AUDIO | DTS_AUDIO | DTS_HD_AUDIO | DTS_HD_MASTER_AUDIO | DTS_HD_SECONDARY | LPCM_AUDIO | MPEG1_AUDIO
-            | MPEG2_AUDIO | MPEG2_AAC | MPEG4_AAC | IGS | PGS | SUBTITLE
+        HEVC_VIDEO
+            | AVC_VIDEO
+            | MPEG1_VIDEO
+            | MPEG2_VIDEO
+            | VC1_VIDEO
+            | AC3_AUDIO
+            | AC3_PLUS_AUDIO
+            | AC3_PLUS_SECONDARY
+            | TRUEHD_AUDIO
+            | DTS_AUDIO
+            | DTS_HD_AUDIO
+            | DTS_HD_MASTER_AUDIO
+            | DTS_HD_SECONDARY
+            | LPCM_AUDIO
+            | MPEG1_AUDIO
+            | MPEG2_AUDIO
+            | MPEG2_AAC
+            | MPEG4_AAC
+            | IGS
+            | PGS
+            | SUBTITLE
     );
     known.then_some(pid as u16)
 }
@@ -430,7 +498,10 @@ pub fn parse_mpls(
         return Err(format!("unknown file type {ft}"));
     }
     let (po, co) = (i32be(&d, 8) as usize, i32be(&d, 12) as usize);
-    let mut p = Playlist { name: name.into(), ..Default::default() };
+    let mut p = Playlist {
+        name: name.into(),
+        ..Default::default()
+    };
     let mut pos = po + 4 + 2;
     let items = i16be(&d, pos);
     pos += 4;
@@ -589,7 +660,9 @@ impl Disc {
             source: input.display().to_string(),
             label,
             size: dir_size(&root),
-            is_uhd: sub("index.bdmv").and_then(|n| n.read().ok()).is_some_and(|ix| ix.starts_with(b"INDX0300")),
+            is_uhd: sub("index.bdmv")
+                .and_then(|n| n.read().ok())
+                .is_some_and(|ix| ix.starts_with(b"INDX0300")),
             is_bdplus: ["BDSVM", "SLYVM", "ANYVM"].iter().any(|n| root.find(n).is_some()),
             is_bdjava: nonempty(sub("BDJO")),
             is_dbox: root.find("FilmIndex.xml").is_some(),
@@ -613,7 +686,11 @@ impl Disc {
             for n in list_ext(&cd, "clpi") {
                 let name = n.name.to_uppercase();
                 // one read per file: the metadata area is small and contiguous, keep the head moving forward
-                match n.read().map_err(|e| e.to_string()).and_then(|d| parse_clpi(&d).map(|s| (s, ep_map(&d)))) {
+                match n
+                    .read()
+                    .map_err(|e| e.to_string())
+                    .and_then(|d| parse_clpi(&d).map(|s| (s, ep_map(&d))))
+                {
                     Ok((s, e)) => {
                         disc.eps.insert(name.clone(), e);
                         disc.clpis.insert(name, s);
@@ -625,7 +702,15 @@ impl Disc {
         if let Some(sd) = sub("STREAM") {
             for n in list_ext(&sd, "m2ts") {
                 let name = n.name.to_uppercase();
-                disc.files.insert(name.clone(), StreamFile { name, size: n.size, node: Some(n), ..Default::default() });
+                disc.files.insert(
+                    name.clone(),
+                    StreamFile {
+                        name,
+                        size: n.size,
+                        node: Some(n),
+                        ..Default::default()
+                    },
+                );
             }
         }
         step("Reading playlists");
@@ -659,7 +744,12 @@ impl Disc {
         if DISABLE.load(Ordering::Relaxed) {
             return;
         }
-        let probe = self.files.values().filter(|f| f.size >= 6144).min_by_key(|f| f.size).and_then(|f| f.node.clone());
+        let probe = self
+            .files
+            .values()
+            .filter(|f| f.size >= 6144)
+            .min_by_key(|f| f.size)
+            .and_then(|f| f.node.clone());
         let Some(probe) = probe else { return };
         let readable = |h: Option<Vec<u8>>| h.is_some_and(|h| !scrambled(&h));
         // TUXINFO_TIMING=1 prints how long each libbluray step takes (to stderr)
@@ -669,7 +759,11 @@ impl Disc {
         let opened = open(path);
         step("Checking that the stream files decrypt");
         if timing {
-            eprintln!("tuxinfo: libbluray open: {:.1}s ({})", t0.elapsed().as_secs_f32(), if opened.is_ok() { "ok" } else { "failed" });
+            eprintln!(
+                "tuxinfo: libbluray open: {:.1}s ({})",
+                t0.elapsed().as_secs_f32(),
+                if opened.is_ok() { "ok" } else { "failed" }
+            );
         }
         match opened {
             Ok(bd) => {
@@ -677,7 +771,11 @@ impl Disc {
                 let t1 = std::time::Instant::now();
                 let dec = head_of(&probe.decrypted(&bd));
                 if timing {
-                    eprintln!("tuxinfo: first decrypted read: {:.1}s ({})", t1.elapsed().as_secs_f32(), if dec.is_some() { "ok" } else { "failed" });
+                    eprintln!(
+                        "tuxinfo: first decrypted read: {:.1}s ({})",
+                        t1.elapsed().as_secs_f32(),
+                        if dec.is_some() { "ok" } else { "failed" }
+                    );
                 }
                 if readable(dec.clone()) {
                     for f in self.files.values_mut() {
@@ -725,10 +823,16 @@ impl Disc {
     /// Build a user playlist (BDInfo's "Custom playlist") from clips of existing playlists, given as
     /// (playlist name, clip index). Replaces a playlist of the same name. Returns its index.
     pub fn add_custom(&mut self, name: &str, items: &[(String, usize)]) -> Option<usize> {
-        let mut p = Playlist { name: name.to_string(), custom: true, ..Default::default() };
+        let mut p = Playlist {
+            name: name.to_string(),
+            custom: true,
+            ..Default::default()
+        };
         let mut total = 0.0;
         for (pn, ci) in items {
-            let Some(src) = self.playlists.iter().find(|q| &q.name == pn) else { continue };
+            let Some(src) = self.playlists.iter().find(|q| &q.name == pn) else {
+                continue;
+            };
             let Some(c) = src.clips.get(*ci) else { continue };
             p.listed.extend(src.listed.iter().copied());
             let mut c = c.clone();
@@ -781,7 +885,11 @@ impl Disc {
 
     pub fn refresh_flags(&mut self) {
         for p in &self.playlists {
-            self.is_50hz |= p.streams.list.iter().any(|s| s.is_video() && matches!((s.fr_num, s.fr_den), (25000, 1000) | (50000, 1000)));
+            self.is_50hz |= p
+                .streams
+                .list
+                .iter()
+                .any(|s| s.is_video() && matches!((s.fr_num, s.fr_den), (25000, 1000) | (50000, 1000)));
         }
     }
 }
@@ -804,6 +912,11 @@ fn xml_title(x: &str) -> Option<String> {
     let t = &x[x.find("<di:title>")?..];
     let t = &t[t.find("<di:name>")? + 9..];
     let name = t[..t.find("</di:name>")?].trim();
-    let name = name.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'");
+    let name = name
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'");
     (!name.is_empty() && !name.eq_ignore_ascii_case("blu-ray")).then_some(name)
 }

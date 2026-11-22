@@ -142,8 +142,40 @@ fn mode_from(c: u8) -> AudioMode {
 /// Destructured in full so that adding a field to `Stream` stops the build until it is saved here.
 fn put_stream(w: &mut Wr, s: &Stream) {
     let Stream {
-        pid, stype, lang, lang_name, bitrate, active_bitrate, is_vbr, initialized, hidden, payload_bytes, packet_count, packet_seconds, height, interlaced, fr_num, fr_den,
-        aspect, profile, ext_info, hevc: _, layout, sample_rate, channels, bit_depth, lfe, dial_norm, has_ext, mode, core, codec_text, width, captions, forced_captions, last_frame,
+        pid,
+        stype,
+        lang,
+        lang_name,
+        bitrate,
+        active_bitrate,
+        is_vbr,
+        initialized,
+        hidden,
+        payload_bytes,
+        packet_count,
+        packet_seconds,
+        height,
+        interlaced,
+        fr_num,
+        fr_den,
+        aspect,
+        profile,
+        ext_info,
+        hevc: _,
+        layout,
+        sample_rate,
+        channels,
+        bit_depth,
+        lfe,
+        dial_norm,
+        has_ext,
+        mode,
+        core,
+        codec_text,
+        width,
+        captions,
+        forced_captions,
+        last_frame,
         caption_ids,
     } = s;
     w.u16(*pid);
@@ -201,7 +233,11 @@ fn get_stream(r: &mut Rd, depth: u8) -> Option<Stream> {
     if depth > 2 {
         return None;
     }
-    let mut s = Stream { pid: r.u16()?, stype: r.u8()?, ..Default::default() };
+    let mut s = Stream {
+        pid: r.u16()?,
+        stype: r.u8()?,
+        ..Default::default()
+    };
     s.lang = r.str()?;
     s.lang_name = r.str()?;
     s.bitrate = r.i64()?;
@@ -230,7 +266,11 @@ fn get_stream(r: &mut Rd, depth: u8) -> Option<Stream> {
     s.dial_norm = r.i32()?;
     s.has_ext = r.bool()?;
     s.mode = mode_from(r.u8()?);
-    s.core = if r.bool()? { Some(Box::new(get_stream(r, depth + 1)?)) } else { None };
+    s.core = if r.bool()? {
+        Some(Box::new(get_stream(r, depth + 1)?))
+    } else {
+        None
+    };
     s.codec_text = r.str()?;
     s.width = r.i32()?;
     s.captions = r.i32()?;
@@ -387,11 +427,21 @@ fn decode(data: &[u8], fp: u64) -> Option<Cache> {
             let mut v = Vec::with_capacity(n);
             for _ in 0..n {
                 let (marker, interval, bytes, t) = (r.f64()?, r.f64()?, r.u32()?, r.u8()?);
-                v.push(Diag { marker, interval, bytes: bytes as u64, tag: tags.get(t as usize).copied().unwrap_or("") });
+                v.push(Diag {
+                    marker,
+                    interval,
+                    bytes: bytes as u64,
+                    tag: tags.get(t as usize).copied().unwrap_or(""),
+                });
             }
             diag.push((pid, v));
         }
-        files.push(FileRec { name, length, streams, diag });
+        files.push(FileRec {
+            name,
+            length,
+            streams,
+            diag,
+        });
     }
     let n = r.count(16)?;
     let mut pls = Vec::new();
@@ -405,9 +455,21 @@ fn decode(data: &[u8], fp: u64) -> Option<Cache> {
         for _ in 0..nc {
             clips.push((r.u64()?, r.u64()?, r.f64()?));
         }
-        pls.push(PlRec { name, hidden, loops, streams, clips });
+        pls.push(PlRec {
+            name,
+            hidden,
+            loops,
+            streams,
+            clips,
+        });
     }
-    Some(Cache { extended, when, warnings, files, pls })
+    Some(Cache {
+        extended,
+        when,
+        warnings,
+        files,
+        pls,
+    })
 }
 
 // ---- disc <-> cache ---------------------------------------------------------------------------
@@ -444,12 +506,19 @@ fn fingerprint(d: &Disc) -> u64 {
 }
 
 fn file_name(d: &Disc, fp: u64) -> String {
-    let label: String = d.label.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).take(40).collect();
+    let label: String = d
+        .label
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .take(40)
+        .collect();
     format!("{}-{:016x}.scan", if label.is_empty() { "disc" } else { &label }, fp)
 }
 
 fn now() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 /// "2026-11-21" (UTC).
@@ -486,16 +555,41 @@ fn collect(d: &Disc, names: &[String]) -> (Vec<FileRec>, Vec<PlRec>) {
             hidden: p.has_hidden_tracks,
             loops: p.has_loops,
             streams: p.streams.clone(),
-            clips: p.clips.iter().map(|c| (c.payload_bytes, c.packet_count, c.packet_seconds)).collect(),
+            clips: p
+                .clips
+                .iter()
+                .map(|c| (c.payload_bytes, c.packet_count, c.packet_seconds))
+                .collect(),
         });
     }
     (files, pls)
 }
 
 fn file_rec(f: &StreamFile) -> FileRec {
-    let mut diag: Vec<(u16, Vec<Diag>)> = f.diag.iter().map(|(p, v)| (*p, v.iter().map(|g| Diag { marker: g.marker, interval: g.interval, bytes: g.bytes, tag: g.tag }).collect())).collect();
+    let mut diag: Vec<(u16, Vec<Diag>)> = f
+        .diag
+        .iter()
+        .map(|(p, v)| {
+            (
+                *p,
+                v.iter()
+                    .map(|g| Diag {
+                        marker: g.marker,
+                        interval: g.interval,
+                        bytes: g.bytes,
+                        tag: g.tag,
+                    })
+                    .collect(),
+            )
+        })
+        .collect();
     diag.sort_by_key(|x| x.0);
-    FileRec { name: f.name.clone(), length: f.length, streams: f.streams.clone(), diag }
+    FileRec {
+        name: f.name.clone(),
+        length: f.length,
+        streams: f.streams.clone(),
+        diag,
+    }
 }
 
 /// Write the scan of `names` (the playlists just scanned) next to anything saved earlier for the
@@ -506,9 +600,19 @@ pub fn save(d: &Disc, extended: bool, names: &[String], warnings: &[String]) -> 
     let fp = fingerprint(d);
     let path = dir.join(file_name(d, fp));
     let (files, pls) = collect(d, names);
-    let mut c = Cache { extended, when: now(), warnings: warnings.to_vec(), files, pls };
+    let mut c = Cache {
+        extended,
+        when: now(),
+        warnings: warnings.to_vec(),
+        files,
+        pls,
+    };
     // keep playlists saved by earlier scans of this disc (same settings) that this scan did not redo
-    if let Some(old) = std::fs::read(&path).ok().and_then(|b| decode(&b, fp)).filter(|o| o.extended == extended) {
+    if let Some(old) = std::fs::read(&path)
+        .ok()
+        .and_then(|b| decode(&b, fp))
+        .filter(|o| o.extended == extended)
+    {
         for p in old.pls {
             if !c.pls.iter().any(|x| x.name == p.name) {
                 c.pls.push(p);
@@ -551,7 +655,9 @@ pub fn load(d: &mut Disc, extended: bool) -> Option<Loaded> {
         }
     }
     for rec in c.pls {
-        let Some(p) = d.playlists.iter_mut().find(|p| !p.custom && p.name == rec.name) else { continue };
+        let Some(p) = d.playlists.iter_mut().find(|p| !p.custom && p.name == rec.name) else {
+            continue;
+        };
         if p.clips.len() != rec.clips.len() {
             continue;
         }
@@ -569,21 +675,29 @@ pub fn load(d: &mut Disc, extended: bool) -> Option<Loaded> {
         return None;
     }
     d.refresh_flags();
-    Some(Loaded { when: c.when, playlists: applied, warnings: c.warnings })
+    Some(Loaded {
+        when: c.when,
+        playlists: applied,
+        warnings: c.warnings,
+    })
 }
 
 /// Delete every saved scan; returns how many files were removed.
 pub fn clear() -> usize {
     let Some(dir) = dir() else { return 0 };
     let Ok(rd) = std::fs::read_dir(dir) else { return 0 };
-    rd.flatten().filter(|e| e.path().extension().is_some_and(|x| x == "scan") && std::fs::remove_file(e.path()).is_ok()).count()
+    rd.flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "scan") && std::fs::remove_file(e.path()).is_ok())
+        .count()
 }
 
 /// (files, total bytes) of the saved scans.
 pub fn usage() -> (usize, u64) {
     let Some(dir) = dir() else { return (0, 0) };
     let Ok(rd) = std::fs::read_dir(dir) else { return (0, 0) };
-    rd.flatten().filter(|e| e.path().extension().is_some_and(|x| x == "scan")).fold((0, 0), |(n, b), e| (n + 1, b + e.metadata().map_or(0, |m| m.len())))
+    rd.flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "scan"))
+        .fold((0, 0), |(n, b), e| (n + 1, b + e.metadata().map_or(0, |m| m.len())))
 }
 
 #[cfg(test)]
@@ -598,12 +712,18 @@ mod tests {
         let tmp = std::env::temp_dir().join(format!("tuxinfo-scancache-test-{}", std::process::id()));
         std::env::set_var("XDG_CONFIG_HOME", &tmp);
         for path in std::env::var("CACHE_DISCS").unwrap_or("/tmp/pv:/tmp/hvdisc".into()).split(':') {
-            let Ok(mut a) = Disc::open(std::path::Path::new(path)) else { continue };
+            let Ok(mut a) = Disc::open(std::path::Path::new(path)) else {
+                continue;
+            };
             a.finish();
             let sel: Vec<usize> = (0..a.playlists.len()).collect();
             let warnings = scan::scan(&mut a, &sel, Mode::Both, &mut |_| true);
             let names: Vec<String> = a.playlists.iter().map(|p| p.name.clone()).collect();
-            let opts = || report::Options { diag: true, summary: true, warnings: warnings.clone() };
+            let opts = || report::Options {
+                diag: true,
+                summary: true,
+                warnings: warnings.clone(),
+            };
             let want = report::generate(&a, &sel, &opts());
             save(&a, false, &names, &warnings).unwrap();
             let mut b = Disc::open(std::path::Path::new(path)).unwrap();

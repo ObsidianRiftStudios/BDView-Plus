@@ -16,12 +16,16 @@ pub fn n0(v: i64) -> String {
     let s = v.unsigned_abs().to_string();
     let mut o = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             o.push(',');
         }
         o.push(c);
     }
-    if v < 0 { format!("-{o}") } else { o }
+    if v < 0 {
+        format!("-{o}")
+    } else {
+        o
+    }
 }
 
 fn nf(x: f64) -> String {
@@ -32,7 +36,13 @@ fn nf(x: f64) -> String {
 fn ts(secs: f64, hw: usize) -> String {
     let ticks = (secs * 1e7) as i64;
     let ms = ticks / 10_000;
-    format!("{:0hw$}:{:02}:{:02}.{:03}", (ms / 3_600_000) % 24, (ms / 60_000) % 60, (ms / 1000) % 60, ms % 1000)
+    format!(
+        "{:0hw$}:{:02}:{:02}.{:03}",
+        (ms / 3_600_000) % 24,
+        (ms / 60_000) % 60,
+        (ms / 1000) % 60,
+        ms % 1000
+    )
 }
 
 fn mbps(bits_per_sec: f64) -> String {
@@ -66,7 +76,15 @@ struct Window {
 
 impl Window {
     fn new(limit: f64) -> Self {
-        Window { bits: VecDeque::new(), secs: VecDeque::new(), bits_sum: 0.0, secs_sum: 0.0, peak: 0.0, loc: 0.0, limit }
+        Window {
+            bits: VecDeque::new(),
+            secs: VecDeque::new(),
+            bits_sum: 0.0,
+            secs_sum: 0.0,
+            peak: 0.0,
+            loc: 0.0,
+            limit,
+        }
     }
     fn reset(&mut self) {
         *self = Window::new(self.limit);
@@ -90,7 +108,13 @@ impl Window {
 
 pub fn generate(disc: &Disc, sel: &[usize], o: &Options) -> String {
     let mut r = String::new();
-    let protection = if disc.is_bdplus { "BD+" } else if disc.is_uhd { "AACS2" } else { "AACS" };
+    let protection = if disc.is_bdplus {
+        "BD+"
+    } else if disc.is_uhd {
+        "AACS2"
+    } else {
+        "AACS"
+    };
     let mut extras = Vec::new();
     for (f, n) in [
         (disc.is_uhd, "Ultra HD"),
@@ -174,8 +198,28 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
     let _ = write!(r, "\n********************\nPLAYLIST: {}\n********************\n\n", p.name);
     *r += "<--- BEGIN FORUMS PASTE --->\n[code]\n";
     *r += &row("", "", "", "", "", "Total", "Video", "", "");
-    *r += &row("Title", "Codec", "Length", "Movie Size", "Disc Size", "Bitrate", "Bitrate", "Main Audio Track", "Secondary Audio Track");
-    *r += &row("-----", "------", "-------", "--------------", "--------------", "-------", "-------", "------------------", "---------------------");
+    *r += &row(
+        "Title",
+        "Codec",
+        "Length",
+        "Movie Size",
+        "Disc Size",
+        "Bitrate",
+        "Bitrate",
+        "Main Audio Track",
+        "Secondary Audio Track",
+    );
+    *r += &row(
+        "-----",
+        "------",
+        "-------",
+        "--------------",
+        "--------------",
+        "-------",
+        "-------",
+        "------------------",
+        "---------------------",
+    );
     *r += &row(
         &p.name,
         &video_codec,
@@ -229,12 +273,29 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
         let _ = writeln!(r, "{:<32}{:<16}{:<16}{:<16}", "-----", "--------", "-------", "-----------");
         for s in &audio {
             let br = format!("{} kbps", kbps_int(s.bitrate));
-            let _ = writeln!(r, "{:<32}{:<16}{:<16}{:<16}", format!("{}{}", star(s), s.codec_name()), s.lang_name, br, s.description());
-            let _ = writeln!(summary, "{}Audio: {} / {} / {}", star(s), s.lang_name, s.codec_name(), s.description());
+            let _ = writeln!(
+                r,
+                "{:<32}{:<16}{:<16}{:<16}",
+                format!("{}{}", star(s), s.codec_name()),
+                s.lang_name,
+                br,
+                s.description()
+            );
+            let _ = writeln!(
+                summary,
+                "{}Audio: {} / {} / {}",
+                star(s),
+                s.lang_name,
+                s.codec_name(),
+                s.description()
+            );
         }
     }
     for (title, kind) in [("SUBTITLES", 0), ("TEXT", 1)] {
-        let list: Vec<&&Stream> = sorted.iter().filter(|s| if kind == 0 { s.is_graphics() } else { s.is_text() }).collect();
+        let list: Vec<&&Stream> = sorted
+            .iter()
+            .filter(|s| if kind == 0 { s.is_graphics() } else { s.is_text() })
+            .collect();
         if list.is_empty() {
             continue;
         }
@@ -243,7 +304,14 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
         let _ = writeln!(r, "{:<32}{:<16}{:<16}{:<16}", "-----", "--------", "-------", "-----------");
         for s in list {
             let br = format!("{:.3} kbps", s.bitrate as f64 / 1000.0);
-            let _ = writeln!(r, "{:<32}{:<16}{:<16}{:<16}", format!("{}{}", star(s), s.codec_name()), s.lang_name, br, s.description());
+            let _ = writeln!(
+                r,
+                "{:<32}{:<16}{:<16}{:<16}",
+                format!("{}{}", star(s), s.codec_name()),
+                s.lang_name,
+                br,
+                s.description()
+            );
             if kind == 0 {
                 let _ = writeln!(summary, "{}Subtitle: {} / {}", star(s), s.lang_name, br);
             }
@@ -251,8 +319,16 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
     }
 
     *r += "\nFILES:\n\n";
-    let _ = writeln!(r, "{:<16}{:<16}{:<16}{:<16}{:<16}", "Name", "Time In", "Length", "Size", "Total Bitrate");
-    let _ = writeln!(r, "{:<16}{:<16}{:<16}{:<16}{:<16}", "----", "-------", "------", "----", "-------------");
+    let _ = writeln!(
+        r,
+        "{:<16}{:<16}{:<16}{:<16}{:<16}",
+        "Name", "Time In", "Length", "Size", "Total Bitrate"
+    );
+    let _ = writeln!(
+        r,
+        "{:<16}{:<16}{:<16}{:<16}{:<16}",
+        "----", "-------", "------", "----", "-------------"
+    );
     for c in &p.clips {
         let mut name = c.name.clone();
         if c.angle > 0 {
@@ -274,10 +350,30 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
     if o.diag {
         *r += "\nSTREAM DIAGNOSTICS:\n\n";
         let hdr = |r: &mut String, v: [&str; 9]| {
-            let _ = writeln!(r, "{:<16}{:<16}{:<16}{:<16}{:<24}{:<24}{:<24}{:<16}{:<16}", v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]);
+            let _ = writeln!(
+                r,
+                "{:<16}{:<16}{:<16}{:<16}{:<24}{:<24}{:<24}{:<16}{:<16}",
+                v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]
+            );
         };
-        hdr(r, ["File", "PID", "Type", "Codec", "Language", "Seconds", "Bitrate", "Bytes", "Packets"]);
-        hdr(r, ["----", "---", "----", "-----", "--------", "--------------", "--------------", "-------------", "-----"]);
+        hdr(
+            r,
+            ["File", "PID", "Type", "Codec", "Language", "Seconds", "Bitrate", "Bytes", "Packets"],
+        );
+        hdr(
+            r,
+            [
+                "----",
+                "---",
+                "----",
+                "-----",
+                "--------",
+                "--------------",
+                "--------------",
+                "-------------",
+                "-----",
+            ],
+        );
         let mut seen = HashSet::new();
         for c in &p.clips {
             let Some(f) = disc.files.get(&c.name) else { continue };
@@ -291,11 +387,18 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
             for cs in &f.streams.list {
                 let Some(ps) = p.streams.get(cs.pid) else { continue };
                 let (secs, rate) = if f.length > 0.0 {
-                    (format!("{:.3}", f.length), n0(rnd(cs.payload_bytes as f64 * 8.0 / f.length / 1000.0) as i64))
+                    (
+                        format!("{:.3}", f.length),
+                        n0(rnd(cs.payload_bytes as f64 * 8.0 / f.length / 1000.0) as i64),
+                    )
                 } else {
                     ("0".to_string(), "0".to_string())
                 };
-                let lang = if ps.lang.is_empty() { String::new() } else { format!("{} ({})", ps.lang, ps.lang_name) };
+                let lang = if ps.lang.is_empty() {
+                    String::new()
+                } else {
+                    format!("{} ({})", ps.lang, ps.lang_name)
+                };
                 hdr(
                     r,
                     [
@@ -326,8 +429,36 @@ fn playlist_report(r: &mut String, disc: &Disc, p: &Playlist, info: &str, protec
 fn chapters(r: &mut String, disc: &Disc, p: &Playlist, diag_pid: Option<u16>) {
     *r += "\nCHAPTERS:\n\n";
     let cols = |v: [&str; 13]| v.iter().fold(String::new(), |a, s| a + &format!("{s:<16}")) + "\n";
-    *r += &cols(["Number", "Time In", "Length", "Avg Video Rate", "Max 1-Sec Rate", "Max 1-Sec Time", "Max 5-Sec Rate", "Max 5-Sec Time", "Max 10Sec Rate", "Max 10Sec Time", "Avg Frame Size", "Max Frame Size", "Max Frame Time"]);
-    *r += &cols(["------", "-------", "------", "--------------", "--------------", "--------------", "--------------", "--------------", "--------------", "--------------", "--------------", "--------------", "--------------"]);
+    *r += &cols([
+        "Number",
+        "Time In",
+        "Length",
+        "Avg Video Rate",
+        "Max 1-Sec Rate",
+        "Max 1-Sec Time",
+        "Max 5-Sec Rate",
+        "Max 5-Sec Time",
+        "Max 10Sec Rate",
+        "Max 10Sec Time",
+        "Avg Frame Size",
+        "Max Frame Size",
+        "Max Frame Time",
+    ]);
+    *r += &cols([
+        "------",
+        "-------",
+        "------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+        "--------------",
+    ]);
     let Some(pid) = diag_pid else { return };
     let total = p.total_length();
     let mut w = [Window::new(1.0), Window::new(5.0), Window::new(10.0)];

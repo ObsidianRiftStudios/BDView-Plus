@@ -16,10 +16,25 @@ pub enum Update {
 /// Ask the repository's latest release and compare it with this version.
 #[allow(dead_code)]
 pub fn check() -> Result<Update, String> {
-    let slug = REPO_URL.trim_end_matches('/').strip_prefix("https://github.com/").ok_or("The repository address is not set yet.")?;
+    let slug = REPO_URL
+        .trim_end_matches('/')
+        .strip_prefix("https://github.com/")
+        .ok_or("The repository address is not set yet.")?;
     let url = format!("https://api.github.com/repos/{slug}/releases/latest");
     let out = std::process::Command::new("curl")
-        .args(["-sS", "-L", "-m", "15", "-w", "\n%{http_code}", "-H", "Accept: application/vnd.github+json", "-A", "TuxInfo", &url])
+        .args([
+            "-sS",
+            "-L",
+            "-m",
+            "15",
+            "-w",
+            "\n%{http_code}",
+            "-H",
+            "Accept: application/vnd.github+json",
+            "-A",
+            "TuxInfo",
+            &url,
+        ])
         .output()
         .map_err(|_| "Could not run curl (install it to check for updates).".to_string())?;
     let body = String::from_utf8_lossy(&out.stdout).to_string();
@@ -27,7 +42,12 @@ pub fn check() -> Result<Update, String> {
     match code.trim() {
         "200" => {}
         "404" => return Err("No release has been published yet.".into()),
-        "" => return Err(format!("Could not reach the server: {}", String::from_utf8_lossy(&out.stderr).trim())),
+        "" => {
+            return Err(format!(
+                "Could not reach the server: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ))
+        }
         c => return Err(format!("The server answered with HTTP {c}.")),
     }
     let tag = json
@@ -36,11 +56,20 @@ pub fn check() -> Result<Update, String> {
         .and_then(|s| s.split('"').nth(1))
         .ok_or("The answer had no version number.")?
         .to_string();
-    if newer(&tag, version()) { Ok(Update::Newer(tag)) } else { Ok(Update::Current) }
+    if newer(&tag, version()) {
+        Ok(Update::Newer(tag))
+    } else {
+        Ok(Update::Current)
+    }
 }
 
 #[allow(dead_code)]
 fn newer(tag: &str, cur: &str) -> bool {
-    let nums = |s: &str| -> Vec<u64> { s.trim_start_matches(['v', 'V']).split(['.', '-', '+']).map_while(|p| p.parse().ok()).collect() };
+    let nums = |s: &str| -> Vec<u64> {
+        s.trim_start_matches(['v', 'V'])
+            .split(['.', '-', '+'])
+            .map_while(|p| p.parse().ok())
+            .collect()
+    };
     nums(tag) > nums(cur)
 }

@@ -61,12 +61,15 @@ pub struct Disc {
     lock: Mutex<()>,
 }
 
-// libbluray handles may be used from any thread as long as calls do not overlap (see `lock`).
+// SAFETY: libbluray handles may be used from any thread as long as calls do not overlap; every call
+// that touches `bd` or a file handle taken from it goes through `lock`.
 unsafe impl Send for Disc {}
 unsafe impl Sync for Disc {}
 
 impl Drop for Disc {
     fn drop(&mut self) {
+        // SAFETY: `bd` came from `bd_open` and is closed exactly once; every `Reader` holds an `Arc<Disc>`,
+        // so no file handle outlives it.
         unsafe { (self.close)(self.bd) }
     }
 }
@@ -85,11 +88,22 @@ fn find_mmbd() -> Option<String> {
     if var_os("TUXINFO_NO_MMBD").is_some() {
         return None;
     }
-    let mut dirs: Vec<String> = var_os("TUXINFO_MMBD").map(|v| v.to_string_lossy().into_owned()).into_iter().collect();
+    let mut dirs: Vec<String> = var_os("TUXINFO_MMBD")
+        .map(|v| v.to_string_lossy().into_owned())
+        .into_iter()
+        .collect();
     dirs.extend(
-        ["/usr/lib", "/usr/lib64", "/usr/local/lib", "/usr/lib/x86_64-linux-gnu", "/usr/lib/aarch64-linux-gnu", "/opt/makemkv/lib", "/opt/makemkv/lib64"]
-            .iter()
-            .map(|d| d.to_string()),
+        [
+            "/usr/lib",
+            "/usr/lib64",
+            "/usr/local/lib",
+            "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/opt/makemkv/lib",
+            "/opt/makemkv/lib64",
+        ]
+        .iter()
+        .map(|d| d.to_string()),
     );
     if let Some(d) = dirs.iter().find(|d| Path::new(d).join("libmmbd.so.0").exists()) {
         return Some(format!("{d}/libmmbd"));
@@ -134,24 +148,41 @@ pub fn open(path: &Path) -> Result<Arc<Disc>, String> {
         let h = h.ok_or("libbluray not found (install libbluray, or set TUXINFO_LIBBLURAY to its path)")?;
         let get = |n: &str| {
             let p = sys::sym(h, cstr(n).unwrap().as_ptr());
-            if p.is_null() { Err(format!("libbluray has no {n}")) } else { Ok(p) }
+            if p.is_null() {
+                Err(format!("libbluray has no {n}"))
+            } else {
+                Ok(p)
+            }
         };
-        let open: OpenFn = std::mem::transmute(get("bd_open")?);
-        let close: CloseFn = std::mem::transmute(get("bd_close")?);
-        let open_file_dec: OpenFileDecFn = std::mem::transmute(get("bd_open_file_dec")?);
+        let open = std::mem::transmute::<*mut std::ffi::c_void, OpenFn>(get("bd_open")?);
+        let close = std::mem::transmute::<*mut std::ffi::c_void, CloseFn>(get("bd_close")?);
+        let open_file_dec = std::mem::transmute::<*mut std::ffi::c_void, OpenFileDecFn>(get("bd_open_file_dec")?);
         if let Ok(p) = get("bd_set_debug_mask") {
             // quiet on stderr, unless TUXINFO_TIMING is set: then libbluray prints everything it logs
-            let mask = if std::env::var_os("TUXINFO_TIMING").is_some() { 0xFFFF_FFFF } else { 0 };
-            std::mem::transmute::<_, unsafe extern "C" fn(u32)>(p)(mask);
+            let mask = if std::env::var_os("TUXINFO_TIMING").is_some() {
+                0xFFFF_FFFF
+            } else {
+                0
+            };
+            std::mem::transmute::<*mut std::ffi::c_void, unsafe extern "C" fn(u32)>(p)(mask);
             if mask != 0 {
-                eprintln!("tuxinfo: LIBAACS_PATH={:?} LIBBDPLUS_PATH={:?}", std::env::var("LIBAACS_PATH").ok(), std::env::var("LIBBDPLUS_PATH").ok());
+                eprintln!(
+                    "tuxinfo: LIBAACS_PATH={:?} LIBBDPLUS_PATH={:?}",
+                    std::env::var("LIBAACS_PATH").ok(),
+                    std::env::var("LIBBDPLUS_PATH").ok()
+                );
             }
         }
         let bd = open(cstr(&path.to_string_lossy())?.as_ptr(), std::ptr::null());
         if bd.is_null() {
             return Err(format!("libbluray could not open {}", path.display()));
         }
-        Ok(Arc::new(Disc { bd, close, open_file_dec, lock: Mutex::new(()) }))
+        Ok(Arc::new(Disc {
+            bd,
+            close,
+            open_file_dec,
+            lock: Mutex::new(()),
+        }))
     }
 }
 
@@ -175,16 +206,25 @@ pub struct Reader {
 impl Disc {
     /// Open `BDMV/STREAM/<name>` through libbluray's decryption layer.
     pub fn open_stream(self: &Arc<Self>, name: &str) -> io::Result<Reader> {
-        let bad = |m: &str| io::Error::new(io::ErrorKind::Other, m.to_string());
+        let bad = |m: &str| io::Error::other(m.to_string());
         let path = cstr(&format!("BDMV/STREAM/{name}")).map_err(|e| bad(&e))?;
         let f = {
             let _g = self.lock.lock().unwrap();
+            // SAFETY: `bd` is valid for the life of `self`, `path` is NUL-terminated, calls are serialised by `lock`.
             unsafe { (self.open_file_dec)(self.bd, path.as_ptr()) }
         };
         if f.is_null() {
             return Err(bad("libbluray could not open the stream file (is AACS decryption set up?)"));
         }
-        Ok(Reader { f, buf: vec![0; UNIT * 32], pos: 0, end: 0, done: false, skip: 0, _d: self.clone() })
+        Ok(Reader {
+            f,
+            buf: vec![0; UNIT * 32],
+            pos: 0,
+            end: 0,
+            done: false,
+            skip: 0,
+            _d: self.clone(),
+        })
     }
 }
 
@@ -201,6 +241,7 @@ impl Read for Reader {
             while got + UNIT <= self.buf.len() {
                 let n = {
                     let _g = self._d.lock.lock().unwrap();
+                    // SAFETY: `f` is a live handle owned by this Reader; the destination slice has at least UNIT bytes left.
                     unsafe { ((*self.f).read)(self.f, self.buf[got..].as_mut_ptr(), UNIT as i64) }
                 };
                 if n < 0 {
@@ -214,7 +255,7 @@ impl Read for Reader {
                 got += n as usize;
             }
             if failed && got == 0 {
-                return Err(io::Error::new(io::ErrorKind::Other, "libbluray read failed"));
+                return Err(io::Error::other("libbluray read failed"));
             }
             (self.pos, self.end) = (self.skip.min(got), got);
             self.skip = 0;
@@ -235,6 +276,7 @@ impl Reader {
         let unit = at / UNIT as u64 * UNIT as u64;
         let r = {
             let _g = self._d.lock.lock().unwrap();
+            // SAFETY: `f` is a live handle owned by this Reader; calls are serialised by `lock`.
             unsafe { ((*self.f).seek)(self.f, unit as i64, 0) }
         };
         if r < 0 {
@@ -247,6 +289,8 @@ impl Reader {
 
 impl Drop for Reader {
     fn drop(&mut self) {
+        let _g = self._d.lock.lock().unwrap_or_else(|e| e.into_inner());
+        // SAFETY: `f` is closed exactly once, here, while the Disc that produced it is still alive.
         unsafe { ((*self.f).close)(self.f) }
     }
 }
@@ -280,7 +324,15 @@ impl Disc {
             starts.push(total);
             total += s.end.saturating_sub(s.start);
         }
-        Stream { d: self.clone(), segs, starts, total, cur: None, left: 0, at: 0 }
+        Stream {
+            d: self.clone(),
+            segs,
+            starts,
+            total,
+            cur: None,
+            left: 0,
+            at: 0,
+        }
     }
 }
 
@@ -298,7 +350,10 @@ impl Stream {
         self.cur = None;
         self.left = 0;
         self.at = at;
-        let Some(i) = (0..self.segs.len()).rev().find(|&i| self.starts[i] <= at && at < self.starts[i] + self.segs[i].end - self.segs[i].start) else {
+        let Some(i) = (0..self.segs.len())
+            .rev()
+            .find(|&i| self.starts[i] <= at && at < self.starts[i] + self.segs[i].end - self.segs[i].start)
+        else {
             return at as i64; // the very end
         };
         let seg = &self.segs[i];

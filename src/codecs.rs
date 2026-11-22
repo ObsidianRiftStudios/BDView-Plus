@@ -73,7 +73,11 @@ pub fn mpeg2(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
 }
 
 pub fn avc(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
-    let data = if s.initialized { std::borrow::Cow::Borrowed(&b.data[..]) } else { std::borrow::Cow::Owned(unescape(&b.data)) };
+    let data = if s.initialized {
+        std::borrow::Cow::Borrowed(&b.data[..])
+    } else {
+        std::borrow::Cow::Owned(unescape(&b.data))
+    };
     let (mut parse, mut aud, mut sps) = (0u32, 0, 0);
     let mut profile = "";
     let mut c3 = false;
@@ -115,7 +119,11 @@ pub fn avc(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
                     1 => c3 = (parse & 0x10) != 0,
                     0 => {
                         let l = (parse & 0xFF) as u8;
-                        let level = if l == 11 && c3 { "1b".to_string() } else { format!("{}.{}", l / 10, l % 10) };
+                        let level = if l == 11 && c3 {
+                            "1b".to_string()
+                        } else {
+                            format!("{}.{}", l / 10, l % 10)
+                        };
                         s.profile = Some(format!("{} {}", profile, level));
                         s.is_vbr = true;
                         s.initialized = true;
@@ -143,7 +151,11 @@ pub fn vc1(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
             frame -= 1;
             if frame == 0 {
                 let pt = if interlaced {
-                    if parse & 0x8000_0000 == 0 { (parse & 0x7800_0000) >> 13 } else { (parse & 0x3C00_0000) >> 12 }
+                    if parse & 0x8000_0000 == 0 {
+                        (parse & 0x7800_0000) >> 13
+                    } else {
+                        (parse & 0x3C00_0000) >> 12
+                    }
                 } else {
                     (parse & 0xF000_0000) >> 14
                 };
@@ -186,11 +198,16 @@ pub fn vc1(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
 
 // ---------------------------------------------------------------- AC-3 / E-AC-3
 
-const AC3_BITRATE: [i64; 19] = [32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 576, 640];
+const AC3_BITRATE: [i64; 19] = [
+    32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 576, 640,
+];
 const AC3_CHANNELS: [i32; 8] = [2, 1, 2, 3, 3, 4, 4, 5];
 
 fn ac3_chan_map(map: u32) -> i32 {
-    (0..16).filter(|i| map & (1 << (15 - i)) != 0 && matches!(i, 5 | 6 | 9 | 10 | 11)).count() as i32 * 2
+    (0..16)
+        .filter(|i| map & (1 << (15 - i)) != 0 && matches!(i, 5 | 6 | 9 | 10 | 11))
+        .count() as i32
+        * 2
 }
 
 fn emdf_payload_config(b: &mut Bits) {
@@ -436,7 +453,12 @@ pub fn truehd(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
     }
     if !found {
         *tag = Some("CORE");
-        let core = s.core.get_or_insert_with(|| Box::new(Stream { stype: AC3_AUDIO, ..Default::default() }));
+        let core = s.core.get_or_insert_with(|| {
+            Box::new(Stream {
+                stype: AC3_AUDIO,
+                ..Default::default()
+            })
+        });
         if !core.initialized {
             b.rewind();
             ac3(core, b);
@@ -452,7 +474,21 @@ pub fn truehd(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
     s.channels = 0;
     s.lfe = 0;
     // (is_lfe, channel count) for each of the 13 channel-assignment flags
-    for (lfe, ch) in [(1, 0), (0, 1), (0, 2), (0, 2), (0, 1), (0, 1), (0, 2), (0, 2), (0, 2), (0, 2), (1, 0), (0, 1), (0, 2)] {
+    for (lfe, ch) in [
+        (1, 0),
+        (0, 1),
+        (0, 2),
+        (0, 2),
+        (0, 1),
+        (0, 1),
+        (0, 2),
+        (0, 2),
+        (0, 2),
+        (0, 2),
+        (1, 0),
+        (0, 1),
+        (0, 2),
+    ] {
         if b.bool() {
             s.lfe += lfe;
             s.channels += ch;
@@ -527,11 +563,12 @@ pub fn lpcm(s: &mut Stream, b: &mut Bits) {
 
 // ---------------------------------------------------------------- DTS / DTS-HD
 
-const DCA_SAMPLE_RATES: [i32; 16] = [0, 8000, 16000, 32000, 0, 0, 11025, 22050, 44100, 0, 0, 12000, 24000, 48000, 96000, 192000];
+const DCA_SAMPLE_RATES: [i32; 16] = [
+    0, 8000, 16000, 32000, 0, 0, 11025, 22050, 44100, 0, 0, 12000, 24000, 48000, 96000, 192000,
+];
 const DCA_BIT_RATES: [i64; 32] = [
-    32000, 56000, 64000, 96000, 112000, 128000, 192000, 224000, 256000, 320000, 384000, 448000, 512000, 576000, 640000,
-    768000, 896000, 1024000, 1152000, 1280000, 1344000, 1408000, 1411200, 1472000, 1509000, 1920000, 2048000, 3072000,
-    3840000, 1, 2, 3,
+    32000, 56000, 64000, 96000, 112000, 128000, 192000, 224000, 256000, 320000, 384000, 448000, 512000, 576000, 640000, 768000, 896000,
+    1024000, 1152000, 1280000, 1344000, 1408000, 1411200, 1472000, 1509000, 1920000, 2048000, 3072000, 3840000, 1, 2, 3,
 ];
 const DCA_BITS_PER_SAMPLE: [i32; 7] = [16, 16, 20, 20, 0, 24, 24];
 
@@ -609,8 +646,7 @@ pub fn dts(s: &mut Stream, b: &mut Bits, bitrate: i64) {
 }
 
 const DTSHD_RATES: [i32; 16] = [
-    0x1F40, 0x3E80, 0x7D00, 0xFA00, 0x1F400, 0x5622, 0xAC44, 0x15888, 0x2B110, 0x56220, 0x2EE0, 0x5DC0, 0xBB80, 0x17700,
-    0x2EE00, 0x5DC00,
+    0x1F40, 0x3E80, 0x7D00, 0xFA00, 0x1F400, 0x5622, 0xAC44, 0x15888, 0x2B110, 0x56220, 0x2EE0, 0x5DC0, 0xBB80, 0x17700, 0x2EE00, 0x5DC00,
 ];
 
 pub fn dtshd(s: &mut Stream, b: &mut Bits, bitrate: i64, tag: &mut Tag) {
@@ -628,7 +664,12 @@ pub fn dtshd(s: &mut Stream, b: &mut Bits, bitrate: i64, tag: &mut Tag) {
     }
     if !found {
         *tag = Some("CORE");
-        let core = s.core.get_or_insert_with(|| Box::new(Stream { stype: DTS_AUDIO, ..Default::default() }));
+        let core = s.core.get_or_insert_with(|| {
+            Box::new(Stream {
+                stype: DTS_AUDIO,
+                ..Default::default()
+            })
+        });
         if !core.initialized {
             b.rewind();
             dts(core, b, bitrate);
@@ -777,8 +818,7 @@ const MPA_BITRATE: [[[i32; 16]; 4]; 4] = [
         [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 0],
     ],
 ];
-const MPA_SAMPLE_RATE: [[i32; 4]; 4] =
-    [[11025, 12000, 8000, 0], [0; 4], [22050, 24000, 16000, 0], [44100, 48000, 32000, 0]];
+const MPA_SAMPLE_RATE: [[i32; 4]; 4] = [[11025, 12000, 8000, 0], [0; 4], [22050, 24000, 16000, 0], [44100, 48000, 32000, 0]];
 const MPA_VERSION: [&str; 4] = ["MPEG 2.5", "Unknown MPEG", "MPEG 2", "MPEG 1"];
 const MPA_LAYER: [&str; 4] = ["Unknown Layer", "Layer III", "Layer II", "Layer I"];
 
@@ -806,7 +846,9 @@ pub fn mpa(s: &mut Stream, b: &mut Bits) {
     s.initialized = true;
 }
 
-const AAC_RATES: [i32; 14] = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0];
+const AAC_RATES: [i32; 14] = [
+    96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350, 0,
+];
 
 pub fn aac(s: &mut Stream, b: &mut Bits) {
     if s.initialized {
@@ -890,7 +932,10 @@ pub fn pgs(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
                 b.byte();
                 let forced = b.byte();
                 b.skip(6 * 16);
-                s.last_frame = Frame { forced: forced & 0x40 != 0, finished: false };
+                s.last_frame = Frame {
+                    forced: forced & 0x40 != 0,
+                    finished: false,
+                };
                 s.caption_ids.insert(comp);
             }
         }

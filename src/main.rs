@@ -4,14 +4,14 @@ mod app_info;
 mod bits;
 #[cfg(feature = "bluray")]
 mod bluray;
-mod codecs;
-mod disc;
-mod hevc;
-mod lang;
 #[cfg(feature = "gui")]
 mod chart;
+mod codecs;
+mod disc;
 #[cfg(feature = "gui")]
 mod gui;
+mod hevc;
+mod lang;
 #[cfg(all(feature = "preview", unix))]
 mod mpv;
 #[cfg(all(feature = "preview", unix))]
@@ -69,7 +69,11 @@ fn main() {
                 let v = args.next().unwrap_or_else(|| fail("-p needs a list"));
                 names.extend(v.split(',').map(|s| {
                     let s = s.trim().to_uppercase();
-                    if s.ends_with(".MPLS") { s } else { format!("{s}.MPLS") }
+                    if s.ends_with(".MPLS") {
+                        s
+                    } else {
+                        format!("{s}.MPLS")
+                    }
                 }));
             }
             s if s.starts_with('-') => fail(&format!("unknown option {s}\n{USAGE}")),
@@ -82,7 +86,9 @@ fn main() {
         #[cfg(not(feature = "gui"))]
         fail("this build has no GUI (rebuild with --features gui)");
     }
-    let Some(path) = path else { fail(&format!("no path given\n{USAGE}")) };
+    let Some(path) = path else {
+        fail(&format!("no path given\n{USAGE}"))
+    };
     let mut disc = Disc::open(&path).unwrap_or_else(|e| fail(&e));
     let mut warnings = std::mem::take(&mut disc.errors);
     if !quiet {
@@ -95,7 +101,11 @@ fn main() {
     let mut sel: Vec<usize> = (0..disc.playlists.len())
         .filter(|&i| {
             let p = &disc.playlists[i];
-            if names.is_empty() { all || (p.total_length() >= 20.0 && !p.detect_loops()) } else { names.contains(&p.name) }
+            if names.is_empty() {
+                all || (p.total_length() >= 20.0 && !p.detect_loops())
+            } else {
+                names.contains(&p.name)
+            }
         })
         .collect();
     if let Some(n) = names.iter().find(|n| !disc.playlists.iter().any(|p| &p.name == *n)) {
@@ -108,7 +118,7 @@ fn main() {
         });
     }
     if list {
-        println!("{:<14}{:<14}{:>18}{:>7}  {}", "Name", "Length", "Size (bytes)", "Clips", "Listed");
+        println!("{:<14}{:<14}{:>18}{:>7}  Listed", "Name", "Length", "Size (bytes)", "Clips");
         for i in 0..disc.playlists.len() {
             let p = &disc.playlists[i];
             println!(
@@ -134,19 +144,31 @@ fn main() {
                 eprintln!("\r{} done.{:<60}", p.label, "");
             } else if last.elapsed().as_millis() > 500 {
                 last = Instant::now();
-                let pct = if p.total > 0 { 100 * p.done / p.total } else { 100 };
+                let pct = (100 * p.done).checked_div(p.total).unwrap_or(100);
                 eprint!("\r{} {}: {pct}%  ({} MB/{} MB)  ", p.label, p.file, p.done >> 20, p.total >> 20);
             }
         }
         true
     }));
 
-    let text = report::generate(&disc, &sel, &report::Options { diag, summary: true, warnings });
+    let text = report::generate(
+        &disc,
+        &sel,
+        &report::Options {
+            diag,
+            summary: true,
+            warnings,
+        },
+    );
     match out {
         None => print!("{text}"),
         Some(mut p) => {
             if p.is_dir() || p.as_os_str().to_string_lossy().ends_with('/') {
-                let safe: String = disc.label.chars().map(|c| if r#"<>:"/\|?*"#.contains(c) { '_' } else { c }).collect();
+                let safe: String = disc
+                    .label
+                    .chars()
+                    .map(|c| if r#"<>:"/\|?*"#.contains(c) { '_' } else { c })
+                    .collect();
                 p.push(format!("TuxInfo.{safe}.txt"));
             }
             if let Some(d) = p.parent().filter(|d| !d.as_os_str().is_empty()) {

@@ -71,7 +71,7 @@ impl Udf {
     fn read_at(&self, off: u64, buf: &mut [u8]) -> io::Result<()> {
         let mut f = self.f.borrow_mut();
         let eof = || io::Error::new(io::ErrorKind::UnexpectedEof, "read past end of image");
-        if off % SEC == 0 && buf.len() as u64 % SEC == 0 {
+        if off.is_multiple_of(SEC) && (buf.len() as u64).is_multiple_of(SEC) {
             f.seek(SeekFrom::Start(off))?;
             return if fill(&mut f, buf)? < buf.len() { Err(eof()) } else { Ok(()) };
         }
@@ -135,7 +135,11 @@ impl Udf {
         let ads = d.get(start..end).unwrap_or(&[]);
         let alloc = flags & 7;
         if alloc == 3 {
-            return Ok(Fe { is_dir, size, data: Data::Inline(ads.to_vec()) });
+            return Ok(Fe {
+                is_dir,
+                size,
+                data: Data::Inline(ads.to_vec()),
+            });
         }
         let step = match alloc {
             0 => 8,
@@ -149,7 +153,11 @@ impl Udf {
             let (len, ty, lbn) = ((w & 0x3FFF_FFFF) as u64, w >> 30, u32le(&buf, p + 4) as u64);
             let ap = if alloc == 1 {
                 let r = u16le(&buf, p + 8) as usize;
-                if is_dir { r } else { self.data_ref(r) }
+                if is_dir {
+                    r
+                } else {
+                    self.data_ref(r)
+                }
             } else {
                 dpref
             };
@@ -172,17 +180,32 @@ impl Udf {
                 _ => ext.push((u64::MAX, len)),
             }
         }
-        Ok(Fe { is_dir, size, data: Data::Ext(ext) })
+        Ok(Fe {
+            is_dir,
+            size,
+            data: Data::Ext(ext),
+        })
     }
 
     fn node(self: &Rc<Self>, name: String, pref: usize, lbn: u64) -> io::Result<Node> {
         let fe = self.fe(pref, lbn)?;
-        Ok(Node { name, is_dir: fe.is_dir, size: fe.size, src: Src::Udf(self.clone(), Rc::new(fe.data)) })
+        Ok(Node {
+            name,
+            is_dir: fe.is_dir,
+            size: fe.size,
+            src: Src::Udf(self.clone(), Rc::new(fe.data)),
+        })
     }
 
     fn dir(self: &Rc<Self>, data: &Rc<Data>, size: u64) -> io::Result<Vec<Node>> {
         let mut b = Vec::new();
-        UdfReader { u: self.clone(), data: data.clone(), size, pos: 0 }.read_to_end(&mut b)?;
+        UdfReader {
+            u: self.clone(),
+            data: data.clone(),
+            size,
+            pos: 0,
+        }
+        .read_to_end(&mut b)?;
         let (mut p, mut out) = (0, Vec::new());
         while p + 38 <= b.len() && u16le(&b, p) == 257 {
             let chars = b[p + 18];
@@ -279,7 +302,12 @@ impl Node {
     }
     pub fn children(&self) -> Vec<Node> {
         match &self.src {
-            Src::Fs(p) => fs::read_dir(p).into_iter().flatten().flatten().map(|e| Node::fs(&e.path())).collect(),
+            Src::Fs(p) => fs::read_dir(p)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|e| Node::fs(&e.path()))
+                .collect(),
             Src::Udf(u, d) => u.dir(d, self.size).unwrap_or_default(),
             #[cfg(feature = "bluray")]
             Src::Bd(..) => Vec::new(),
@@ -288,7 +316,10 @@ impl Node {
     /// The same file, read through libbluray so that encrypted data comes out decrypted.
     #[cfg(feature = "bluray")]
     pub fn decrypted(&self, d: &std::sync::Arc<crate::bluray::Disc>) -> Node {
-        Node { src: Src::Bd(d.clone(), self.name.clone()), ..self.clone() }
+        Node {
+            src: Src::Bd(d.clone(), self.name.clone()),
+            ..self.clone()
+        }
     }
     pub fn find(&self, name: &str) -> Option<Node> {
         self.children().into_iter().find(|c| c.name.eq_ignore_ascii_case(name))
@@ -296,7 +327,12 @@ impl Node {
     pub fn open(&self) -> io::Result<Box<dyn Read>> {
         Ok(match &self.src {
             Src::Fs(p) => Box::new(File::open(p)?),
-            Src::Udf(u, d) => Box::new(UdfReader { u: u.clone(), data: d.clone(), size: self.size, pos: 0 }),
+            Src::Udf(u, d) => Box::new(UdfReader {
+                u: u.clone(),
+                data: d.clone(),
+                size: self.size,
+                pos: 0,
+            }),
             #[cfg(feature = "bluray")]
             Src::Bd(d, name) => Box::new(d.open_stream(name)?),
         })
@@ -312,7 +348,11 @@ impl Node {
 pub fn open_udf(path: &Path) -> io::Result<(Node, String)> {
     let mut f = File::open(path)?;
     let len = f.seek(SeekFrom::End(0))?;
-    let mut u = Udf { f: RefCell::new(f), bs: SEC, maps: RefCell::new(Vec::new()) };
+    let mut u = Udf {
+        f: RefCell::new(f),
+        bs: SEC,
+        maps: RefCell::new(Vec::new()),
+    };
     let last = (len / SEC).saturating_sub(1);
     let avdp = [256, last, last.saturating_sub(256)]
         .iter()
@@ -341,7 +381,11 @@ pub fn open_udf(path: &Path) -> io::Result<(Node, String)> {
     }
     let lvd = lvd.ok_or_else(|| err("UDF logical volume descriptor not found"))?;
     let bs = u32le(&lvd, 212) as u64;
-    u.bs = if bs.is_power_of_two() && (512..=65536).contains(&bs) { bs } else { SEC };
+    u.bs = if bs.is_power_of_two() && (512..=65536).contains(&bs) {
+        bs
+    } else {
+        SEC
+    };
 
     let start_of = |n: u16| parts.iter().find(|p| p.0 == n).map(|p| p.1);
     let (mut maps, mut phys_nums, mut pending) = (Vec::new(), Vec::new(), Vec::new());
@@ -370,9 +414,14 @@ pub fn open_udf(path: &Path) -> io::Result<(Node, String)> {
     *u.maps.borrow_mut() = maps;
     let u = Rc::new(u);
     for (idx, num, loc) in pending {
-        let phys = phys_nums.iter().position(|&p| p == Some(num)).ok_or_else(|| err("metadata partition has no physical partition"))?;
+        let phys = phys_nums
+            .iter()
+            .position(|&p| p == Some(num))
+            .ok_or_else(|| err("metadata partition has no physical partition"))?;
         let fe = u.fe(phys, loc)?;
-        let Data::Ext(e) = fe.data else { return Err(err("unsupported metadata file layout")) };
+        let Data::Ext(e) = fe.data else {
+            return Err(err("unsupported metadata file layout"));
+        };
         u.maps.borrow_mut()[idx] = Pm::Meta(phys, e.into_iter().map(|(o, l)| (l, o)).collect());
     }
 

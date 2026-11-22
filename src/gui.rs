@@ -15,14 +15,34 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 enum Cmd {
-    Open { path: String, saved: bool, extended: bool },
+    Open {
+        path: String,
+        saved: bool,
+        extended: bool,
+    },
     /// The disc was removed: forget everything about it (and release the drive).
     Close,
-    Scan { names: Vec<String>, extended: bool, save: bool },
-    Report { names: Vec<String>, diag: bool, summary: bool },
-    Chart { name: String, pid: u16, angle: usize, kind: usize },
+    Scan {
+        names: Vec<String>,
+        extended: bool,
+        save: bool,
+    },
+    Report {
+        names: Vec<String>,
+        diag: bool,
+        summary: bool,
+    },
+    Chart {
+        name: String,
+        pid: u16,
+        angle: usize,
+        kind: usize,
+    },
     /// A user playlist built from (playlist name, clip index) pairs.
-    Custom { name: String, items: Vec<(String, usize)> },
+    Custom {
+        name: String,
+        items: Vec<(String, usize)>,
+    },
 }
 
 struct ClipRow {
@@ -113,10 +133,14 @@ fn snapshot(d: &Disc) -> Vec<PlRow> {
     idx.iter()
         .map(|&i| {
             let p = &d.playlists[i];
-            let g = p.clips.iter().find_map(|c| groups.get(c.name.as_str()).copied()).unwrap_or_else(|| {
-                next += 1;
-                next - 1
-            });
+            let g = p
+                .clips
+                .iter()
+                .find_map(|c| groups.get(c.name.as_str()).copied())
+                .unwrap_or_else(|| {
+                    next += 1;
+                    next - 1
+                });
             for c in &p.clips {
                 groups.entry(c.name.as_str()).or_insert(g);
             }
@@ -131,17 +155,30 @@ fn snapshot(d: &Disc) -> Vec<PlRow> {
                     .clips
                     .iter()
                     .map(|c| ClipRow {
-                        name: if c.angle > 0 { format!("{} ({})", c.name, c.angle) } else { c.name.clone() },
+                        name: if c.angle > 0 {
+                            format!("{} ({})", c.name, c.angle)
+                        } else {
+                            c.name.clone()
+                        },
                         index: c.angle + 1,
                         len: c.length,
                         est: c.file_size,
                         meas: c.packet_size(),
                         seg: d.segment(c),
-                        types: d.clpis.get(&c.clpi).map_or(Vec::new(), |s| s.list.iter().map(|x| (x.pid, x.stype)).collect()),
+                        types: d
+                            .clpis
+                            .get(&c.clpi)
+                            .map_or(Vec::new(), |s| s.list.iter().map(|x| (x.pid, x.stype)).collect()),
                     })
                     .collect(),
                 streams: p.sorted().into_iter().map(stream_row).collect(),
-                vids: p.streams.list.iter().filter(|s| s.is_video()).map(|s| (s.pid, format!("{} (PID {})", s.codec_name(), s.pid))).collect(),
+                vids: p
+                    .streams
+                    .list
+                    .iter()
+                    .filter(|s| s.is_video())
+                    .map(|s| (s.pid, format!("{} (PID {})", s.codec_name(), s.pid)))
+                    .collect(),
                 angles: p.angle_count,
             }
         })
@@ -182,10 +219,18 @@ fn worker(rx: Receiver<Cmd>, sh: Sh, cancel: Arc<AtomicBool>, ctx: egui::Context
         };
         let mut progress = |p: &scan::Progress| {
             let mut u = sh.lock().unwrap();
-            u.label = if p.file.is_empty() { format!("{} done", p.label) } else { format!("{} {}", p.label, p.file) };
+            u.label = if p.file.is_empty() {
+                format!("{} done", p.label)
+            } else {
+                format!("{} {}", p.label, p.file)
+            };
             (u.done, u.total) = (p.done, p.total);
             u.elapsed = t0.elapsed().as_secs_f64();
-            u.remaining = if p.done > 0 { u.elapsed * (p.total - p.done) as f64 / p.done as f64 } else { 0.0 };
+            u.remaining = if p.done > 0 {
+                u.elapsed * (p.total - p.done) as f64 / p.done as f64
+            } else {
+                0.0
+            };
             drop(u);
             ctx.request_repaint();
             !cancel.load(Ordering::Relaxed)
@@ -196,7 +241,11 @@ fn worker(rx: Receiver<Cmd>, sh: Sh, cancel: Arc<AtomicBool>, ctx: egui::Context
                 let waiting = crate::bluray::mmbd_found();
                 #[cfg(not(feature = "bluray"))]
                 let waiting = false;
-                begin(if waiting { "Opening disc - waiting for MakeMKV to start (up to 30 s)" } else { "Opening" });
+                begin(if waiting {
+                    "Opening disc - waiting for MakeMKV to start (up to 30 s)"
+                } else {
+                    "Opening"
+                });
                 {
                     let mut u = sh.lock().unwrap();
                     u.log.clear();
@@ -268,7 +317,12 @@ fn worker(rx: Receiver<Cmd>, sh: Sh, cancel: Arc<AtomicBool>, ctx: egui::Context
                 disc = None;
                 warnings.clear();
                 let mut u = sh.lock().unwrap();
-                *u = Shared { rows_ver: u.rows_ver + 1, report_ver: u.report_ver, chart_ver: u.chart_ver, ..Default::default() };
+                *u = Shared {
+                    rows_ver: u.rows_ver + 1,
+                    report_ver: u.report_ver,
+                    chart_ver: u.chart_ver,
+                    ..Default::default()
+                };
             }
             Cmd::Scan { names, extended, save } => {
                 let Some(d) = disc.as_mut() else { continue };
@@ -311,10 +365,27 @@ fn worker(rx: Receiver<Cmd>, sh: Sh, cancel: Arc<AtomicBool>, ctx: egui::Context
             Cmd::Report { names, diag, summary } => {
                 let Some(d) = disc.as_ref() else { continue };
                 let sel: Vec<usize> = names.iter().filter_map(|n| d.playlists.iter().position(|p| &p.name == n)).collect();
-                let mut text = report::generate(d, &sel, &report::Options { diag, summary, warnings: warnings.clone() });
-                let unscanned: Vec<&str> = sel.iter().map(|&i| &d.playlists[i]).filter(|p| p.clips.iter().any(|c| c.has_file) && !p.clips.iter().any(|c| c.packet_count > 0)).map(|p| p.name.as_str()).collect();
+                let mut text = report::generate(
+                    d,
+                    &sel,
+                    &report::Options {
+                        diag,
+                        summary,
+                        warnings: warnings.clone(),
+                    },
+                );
+                let unscanned: Vec<&str> = sel
+                    .iter()
+                    .map(|&i| &d.playlists[i])
+                    .filter(|p| p.clips.iter().any(|c| c.has_file) && !p.clips.iter().any(|c| c.packet_count > 0))
+                    .map(|p| p.name.as_str())
+                    .collect();
                 if !unscanned.is_empty() {
-                    let which = if unscanned.len() == sel.len() { "the stream files have not been scanned".to_string() } else { format!("{} have not been scanned", unscanned.join(", ")) };
+                    let which = if unscanned.len() == sel.len() {
+                        "the stream files have not been scanned".to_string()
+                    } else {
+                        format!("{} have not been scanned", unscanned.join(", "))
+                    };
                     text.insert_str(0, &format!("NOTE: {which} (or the scan was cancelled), so sizes, bit rates and\nstream details for them are empty. Press Scan Bitrates first, then View Report.\n\n"));
                 }
                 let mut u = sh.lock().unwrap();
@@ -323,14 +394,18 @@ fn worker(rx: Receiver<Cmd>, sh: Sh, cancel: Arc<AtomicBool>, ctx: egui::Context
             }
             Cmd::Chart { name, pid, angle, kind } => {
                 let Some(d) = disc.as_ref() else { continue };
-                let Some(pl) = d.playlists.iter().find(|p| p.name == name) else { continue };
+                let Some(pl) = d.playlists.iter().find(|p| p.name == name) else {
+                    continue;
+                };
                 let mut u = sh.lock().unwrap();
                 if crate::chart::has_data(d, pl, pid, angle) {
                     u.chart = Some(Arc::new(crate::chart::build(d, pl, kind, pid, angle)));
                     u.chart_note = None;
                     u.chart_ver += 1;
                 } else {
-                    u.chart_note = Some(format!("No bitrate data for {name} / PID {pid} / angle {angle}: press Scan Bitrates (with this playlist selected) first."));
+                    u.chart_note = Some(format!(
+                        "No bitrate data for {name} / PID {pid} / angle {angle}: press Scan Bitrates (with this playlist selected) first."
+                    ));
                     u.chart_ver += 1;
                 }
             }
@@ -338,7 +413,10 @@ fn worker(rx: Receiver<Cmd>, sh: Sh, cancel: Arc<AtomicBool>, ctx: egui::Context
                 let Some(d) = disc.as_mut() else { continue };
                 let mut u = sh.lock().unwrap();
                 if d.add_custom(&name, &items).is_some() {
-                    u.log.push(format!("Custom playlist {name} added ({} stream files). Press Scan Bitrates to measure it.", items.len()));
+                    u.log.push(format!(
+                        "Custom playlist {name} added ({} stream files). Press Scan Bitrates to measure it.",
+                        items.len()
+                    ));
                     u.custom_added = Some(name);
                     u.rows = Arc::new(snapshot(d));
                     u.rows_ver += 1;
@@ -395,7 +473,20 @@ struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { filter_short: true, short_secs: 20.0, filter_loops: true, human: true, diag: true, summary: true, extended: false, use_saved: true, font: 16.0, report_font: 16.0, report_wrap: true, dark: false }
+        Settings {
+            filter_short: true,
+            short_secs: 20.0,
+            filter_loops: true,
+            human: true,
+            diag: true,
+            summary: true,
+            extended: false,
+            use_saved: true,
+            font: 16.0,
+            report_font: 16.0,
+            report_wrap: true,
+            dark: false,
+        }
     }
 }
 
@@ -411,7 +502,9 @@ fn cfg_path() -> Option<std::path::PathBuf> {
 impl Settings {
     fn load() -> Settings {
         let mut s = Settings::default();
-        let Some(text) = cfg_path().and_then(|p| std::fs::read_to_string(p).ok()) else { return s };
+        let Some(text) = cfg_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
+            return s;
+        };
         for (k, v) in text.lines().filter_map(|l| l.split_once('=')) {
             let (k, v) = (k.trim(), v.trim());
             let b = v == "true";
@@ -443,8 +536,18 @@ impl Settings {
         let _ = std::fs::write(p, t);
     }
     fn same(&self, o: &Settings) -> bool {
-        self.filter_short == o.filter_short && self.short_secs == o.short_secs && self.filter_loops == o.filter_loops && self.human == o.human && self.diag == o.diag
-            && self.summary == o.summary && self.extended == o.extended && self.use_saved == o.use_saved && self.font == o.font && self.report_font == o.report_font && self.report_wrap == o.report_wrap && self.dark == o.dark
+        self.filter_short == o.filter_short
+            && self.short_secs == o.short_secs
+            && self.filter_loops == o.filter_loops
+            && self.human == o.human
+            && self.diag == o.diag
+            && self.summary == o.summary
+            && self.extended == o.extended
+            && self.use_saved == o.use_saved
+            && self.font == o.font
+            && self.report_font == o.report_font
+            && self.report_wrap == o.report_wrap
+            && self.dark == o.dark
     }
 }
 
@@ -471,20 +574,38 @@ fn apply_theme(ctx: &egui::Context, dark: bool) {
 }
 
 fn box_fill(ui: &egui::Ui) -> Color32 {
-    if ui.visuals().dark_mode { Color32::from_gray(22) } else { Color32::WHITE }
+    if ui.visuals().dark_mode {
+        Color32::from_gray(22)
+    } else {
+        Color32::WHITE
+    }
 }
 fn box_edge(ui: &egui::Ui) -> Color32 {
-    if ui.visuals().dark_mode { Color32::from_gray(95) } else { Color32::from_gray(130) }
+    if ui.visuals().dark_mode {
+        Color32::from_gray(95)
+    } else {
+        Color32::from_gray(130)
+    }
 }
 fn track_color(ui: &egui::Ui) -> Color32 {
-    if ui.visuals().dark_mode { Color32::from_gray(44) } else { Color32::from_gray(236) }
+    if ui.visuals().dark_mode {
+        Color32::from_gray(44)
+    } else {
+        Color32::from_gray(236)
+    }
 }
 
 /// Set every text size (and the widget sizes that follow from it) to `size` points.
 fn apply_style(ctx: &egui::Context, size: f32) {
     use egui::TextStyle;
     ctx.global_style_mut(|st| {
-        for (t, k) in [(TextStyle::Body, 1.0), (TextStyle::Button, 1.0), (TextStyle::Monospace, 1.0), (TextStyle::Small, 0.85), (TextStyle::Heading, 1.3)] {
+        for (t, k) in [
+            (TextStyle::Body, 1.0),
+            (TextStyle::Button, 1.0),
+            (TextStyle::Monospace, 1.0),
+            (TextStyle::Small, 0.85),
+            (TextStyle::Heading, 1.3),
+        ] {
             if let Some(f) = st.text_styles.get_mut(&t) {
                 f.size = size * k;
             }
@@ -514,7 +635,14 @@ struct CustomDlg {
 
 impl Default for CustomDlg {
     fn default() -> Self {
-        CustomDlg { name: String::new(), filter: true, pl: None, clip: None, target: Vec::new(), tsel: None }
+        CustomDlg {
+            name: String::new(),
+            filter: true,
+            pl: None,
+            clip: None,
+            target: Vec::new(),
+            tsel: None,
+        }
     }
 }
 
@@ -535,6 +663,7 @@ struct App {
     snap: Settings,
     themed: bool,
     show_about: bool,
+    logo: Option<egui::TextureHandle>,
     upd: Arc<Mutex<String>>,
     /// Text size the window is currently drawn with, and the one being tried in Settings.
     styled: f32,
@@ -586,7 +715,9 @@ impl App {
     /// Play a playlist (or one of its stream files) in the preview window.
     #[cfg(all(feature = "preview", unix))]
     fn play_playlist(&mut self, clip: Option<usize>) {
-        let Some(p) = self.rows.iter().find(|p| Some(&p.name) == self.sel.as_ref()) else { return };
+        let Some(p) = self.rows.iter().find(|p| Some(&p.name) == self.sel.as_ref()) else {
+            return;
+        };
         let (mut start, mut length, mut title) = (0.0, None, p.name.clone());
         if let Some(c) = clip.and_then(|i| p.clips.get(i)) {
             start = p.clips[..clip.unwrap()].iter().map(|c| c.len).sum();
@@ -668,8 +799,16 @@ impl App {
     /// Checked playlists, or every visible one when none are checked.
     fn targets(&self) -> Vec<String> {
         let v = self.visible();
-        let c: Vec<String> = v.iter().filter(|p| self.checked.contains(&p.name)).map(|p| p.name.clone()).collect();
-        if c.is_empty() { v.iter().map(|p| p.name.clone()).collect() } else { c }
+        let c: Vec<String> = v
+            .iter()
+            .filter(|p| self.checked.contains(&p.name))
+            .map(|p| p.name.clone())
+            .collect();
+        if c.is_empty() {
+            v.iter().map(|p| p.name.clone()).collect()
+        } else {
+            c
+        }
     }
     fn open(&mut self, path: String) {
         let path = path.trim().to_string();
@@ -682,7 +821,11 @@ impl App {
         self.checked.clear();
         self.sel = None;
         self.sh.lock().unwrap().busy = true;
-        let _ = self.tx.send(Cmd::Open { path, saved: self.set.use_saved, extended: self.set.extended });
+        let _ = self.tx.send(Cmd::Open {
+            path,
+            saved: self.set.use_saved,
+            extended: self.set.extended,
+        });
     }
 }
 
@@ -705,9 +848,18 @@ fn grip(ui: &mut egui::Ui) -> f32 {
     let (r, resp) = ui.allocate_exact_size(egui::vec2(ui.available_width(), GRIP), egui::Sense::drag());
     let resp = resp.on_hover_cursor(egui::CursorIcon::ResizeVertical);
     let d = ui.visuals().dark_mode;
-    let c = if resp.hovered() || resp.dragged() { Color32::from_gray(if d { 170 } else { 110 }) } else { Color32::from_gray(if d { 80 } else { 185 }) };
-    ui.painter().rect_filled(egui::Rect::from_center_size(r.center(), egui::vec2(48.0, 3.0)), 1.5, c);
-    if resp.dragged() { resp.drag_delta().y } else { 0.0 }
+    let c = if resp.hovered() || resp.dragged() {
+        Color32::from_gray(if d { 170 } else { 110 })
+    } else {
+        Color32::from_gray(if d { 80 } else { 185 })
+    };
+    ui.painter()
+        .rect_filled(egui::Rect::from_center_size(r.center(), egui::vec2(48.0, 3.0)), 1.5, c);
+    if resp.dragged() {
+        resp.drag_delta().y
+    } else {
+        0.0
+    }
 }
 
 /// Column separators for a table drawn into the current box: painted lines you can drag.
@@ -719,9 +871,15 @@ fn col_grips(ui: &mut egui::Ui, table: usize, widths: &[f32], moves: &mut Vec<(u
         x += w + sp;
         let line_x = x - sp / 2.0;
         let hit = egui::Rect::from_min_max(egui::pos2(line_x - 3.0, r.top()), egui::pos2(line_x + 3.0, r.bottom()));
-        let resp = ui.interact(hit, ui.auto_id_with(("colgrip", table, j)), egui::Sense::drag()).on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
+        let resp = ui
+            .interact(hit, ui.auto_id_with(("colgrip", table, j)), egui::Sense::drag())
+            .on_hover_cursor(egui::CursorIcon::ResizeHorizontal);
         let d = ui.visuals().dark_mode;
-        let c = if resp.hovered() || resp.dragged() { Color32::from_gray(if d { 170 } else { 90 }) } else { Color32::from_gray(if d { 80 } else { 190 }) };
+        let c = if resp.hovered() || resp.dragged() {
+            Color32::from_gray(if d { 170 } else { 90 })
+        } else {
+            Color32::from_gray(if d { 80 } else { 190 })
+        };
         ui.painter().vline(line_x, r.top()..=r.bottom(), egui::Stroke::new(1.0, c));
         if resp.dragged() {
             moves.push((table, j, resp.drag_delta().x));
@@ -732,17 +890,24 @@ fn col_grips(ui: &mut egui::Ui, table: usize, widths: &[f32], moves: &mut Vec<(u
 /// White list box with a thin border and a fixed height, like a WinForms ListView.
 fn boxed(ui: &mut egui::Ui, h: f32, f: impl FnOnce(&mut egui::Ui)) {
     let w = ui.available_width();
-    egui::Frame::new().fill(box_fill(ui)).stroke(egui::Stroke::new(1.0, box_edge(ui))).show(ui, |ui| {
-        ui.spacing_mut().item_spacing = egui::vec2(COLSP, 0.0);
-        ui.spacing_mut().scroll = egui::style::ScrollStyle { bar_width: 13.0, foreground_color: true, ..egui::style::ScrollStyle::solid() };
-        let t = track_color(ui);
-        ui.visuals_mut().extreme_bg_color = t; // scroll bar track
-        ui.style_mut().interaction.selectable_labels = false; // so a click on a name selects the row
-        ui.set_width(w - 2.0);
-        ui.set_min_height(h);
-        ui.set_max_height(h);
-        f(ui);
-    });
+    egui::Frame::new()
+        .fill(box_fill(ui))
+        .stroke(egui::Stroke::new(1.0, box_edge(ui)))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(COLSP, 0.0);
+            ui.spacing_mut().scroll = egui::style::ScrollStyle {
+                bar_width: 13.0,
+                foreground_color: true,
+                ..egui::style::ScrollStyle::solid()
+            };
+            let t = track_color(ui);
+            ui.visuals_mut().extreme_bg_color = t; // scroll bar track
+            ui.style_mut().interaction.selectable_labels = false; // so a click on a name selects the row
+            ui.set_width(w - 2.0);
+            ui.set_min_height(h);
+            ui.set_max_height(h);
+            f(ui);
+        });
 }
 
 /// Fixed-height table. `widths` are the pixel widths of all columns; the last one takes whatever is left.
@@ -805,7 +970,11 @@ impl eframe::App for App {
                     self.want_chart = false;
                     if let (None, Some(c)) = (&self.chart_note, u.chart.clone()) {
                         self.chart_seq += 1;
-                        self.charts.push(ChartWin { id: self.chart_seq, view: crate::chart::View::new(&c), ch: c });
+                        self.charts.push(ChartWin {
+                            id: self.chart_seq,
+                            view: crate::chart::View::new(&c),
+                            ch: c,
+                        });
                     }
                 }
             }
@@ -844,23 +1013,40 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 let gap = ui.spacing().item_spacing.x;
                 let w = ui.available_width() - 3.0 * (bsz.x + gap);
-                let r = ui.add_sized([w, bh - 2.0], egui::TextEdit::singleline(&mut self.src).hint_text("Disc drive, folder or ISO image").align(egui::Align2::LEFT_CENTER));
+                let r = ui.add_sized(
+                    [w, bh - 2.0],
+                    egui::TextEdit::singleline(&mut self.src)
+                        .hint_text("Disc drive, folder or ISO image")
+                        .align(egui::Align2::LEFT_CENTER),
+                );
                 if r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                     self.open(self.src.clone());
                 }
-                if ui.add_enabled(!busy, egui::Button::new("Folder...").min_size(bsz)).on_hover_text("Choose a BDMV folder").clicked() {
+                if ui
+                    .add_enabled(!busy, egui::Button::new("Folder...").min_size(bsz))
+                    .on_hover_text("Choose a BDMV folder")
+                    .clicked()
+                {
                     if let Some(p) = rfd::FileDialog::new().set_title("Select the BDMV folder").pick_folder() {
                         self.open(p.display().to_string());
                     }
                 }
-                if ui.add_enabled(!busy, egui::Button::new("ISO...").min_size(bsz)).on_hover_text("Choose a disc image (.iso)").clicked() {
+                if ui
+                    .add_enabled(!busy, egui::Button::new("ISO...").min_size(bsz))
+                    .on_hover_text("Choose a disc image (.iso)")
+                    .clicked()
+                {
                     if let Some(p) = rfd::FileDialog::new().add_filter("Disc image", &["iso", "img", "udf"]).pick_file() {
                         self.open(p.display().to_string());
                     }
                 }
                 let again = if self.opened { "Rescan" } else { "Scan" };
                 if ui.add_enabled(!busy, egui::Button::new(again).min_size(bsz)).clicked() {
-                    let p = if self.src.trim().is_empty() { default_source().unwrap_or_default() } else { self.src.clone() };
+                    let p = if self.src.trim().is_empty() {
+                        default_source().unwrap_or_default()
+                    } else {
+                        self.src.clone()
+                    };
                     self.open(p);
                 }
             });
@@ -877,21 +1063,39 @@ impl eframe::App for App {
                 }
                 if ui.add_enabled(!busy && loaded, b("Custom...")).clicked() {
                     self.show_custom = true;
-                    self.cd = CustomDlg { name: format!("USER.{:03}", self.custom_count + 1), ..Default::default() };
+                    self.cd = CustomDlg {
+                        name: format!("USER.{:03}", self.custom_count + 1),
+                        ..Default::default()
+                    };
                 }
                 // preview buttons sit together on the right (right-to-left, so listed last-first)
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     #[cfg(all(feature = "preview", unix))]
-                    if ui.add(b("Play File...")).on_hover_text("Choose a .m2ts, .mkv, .mp4 ... file and play it in the preview window").clicked() {
-                        if let Some(p) = rfd::FileDialog::new().add_filter("Video", &["m2ts", "mts", "ts", "mkv", "mp4", "m4v", "avi"]).pick_file() {
+                    if ui
+                        .add(b("Play File..."))
+                        .on_hover_text("Choose a .m2ts, .mkv, .mp4 ... file and play it in the preview window")
+                        .clicked()
+                    {
+                        if let Some(p) = rfd::FileDialog::new()
+                            .add_filter("Video", &["m2ts", "mts", "ts", "mkv", "mp4", "m4v", "avi"])
+                            .pick_file()
+                        {
                             let t = p.file_name().map_or(String::new(), |n| n.to_string_lossy().into_owned());
                             self.start_preview(t, crate::mpv::Target::File(p.display().to_string()));
                         }
                     }
-                    if ui.add_enabled(loaded && self.sel_clip.is_some(), b("Play Clip")).on_hover_text("Play the selected stream file (double-click a stream file does the same)").clicked() {
+                    if ui
+                        .add_enabled(loaded && self.sel_clip.is_some(), b("Play Clip"))
+                        .on_hover_text("Play the selected stream file (double-click a stream file does the same)")
+                        .clicked()
+                    {
                         self.play_playlist(self.sel_clip);
                     }
-                    if ui.add_enabled(loaded && self.sel.is_some(), b("Play List")).on_hover_text("Play the selected playlist in the preview window").clicked() {
+                    if ui
+                        .add_enabled(loaded && self.sel.is_some(), b("Play List"))
+                        .on_hover_text("Play the selected playlist in the preview window")
+                        .clicked()
+                    {
                         self.play_playlist(None);
                     }
                 });
@@ -966,7 +1170,11 @@ impl eframe::App for App {
             grip_moves[0] = grip(ui);
             for (n, on) in toggled {
                 clicked = Some(n.clone());
-                if on { self.checked.insert(n); } else { self.checked.remove(&n); }
+                if on {
+                    self.checked.insert(n);
+                } else {
+                    self.checked.remove(&n);
+                }
             }
             if clicked.is_some() {
                 if clicked != self.sel {
@@ -981,7 +1189,10 @@ impl eframe::App for App {
 
             // stream files
             let pl = self.sel.clone().unwrap_or_default();
-            ui.add_sized([ui.available_width(), cap], egui::Label::new(RichText::new(format!("Stream files in {pl}")).strong()));
+            ui.add_sized(
+                [ui.available_width(), cap],
+                egui::Label::new(RichText::new(format!("Stream files in {pl}")).strong()),
+            );
             boxed(ui, hs[1], |ui| {
                 let tw = ui.available_width();
                 let w: Vec<f32> = cw[1].iter().map(|f| f * tw).collect();
@@ -1032,7 +1243,10 @@ impl eframe::App for App {
             grip_moves[1] = grip(ui);
 
             // streams
-            ui.add_sized([ui.available_width(), cap], egui::Label::new(RichText::new(format!("Streams in {pl}")).strong()));
+            ui.add_sized(
+                [ui.available_width(), cap],
+                egui::Label::new(RichText::new(format!("Streams in {pl}")).strong()),
+            );
             boxed(ui, hs[2], |ui| {
                 let tw = ui.available_width();
                 let w: Vec<f32> = cw[2].iter().map(|f| f * tw).collect();
@@ -1067,13 +1281,17 @@ impl eframe::App for App {
 
             // log
             boxed(ui, hs[3], |ui| {
-                egui::ScrollArea::vertical().id_salt("log").stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
-                    ui.add_space(2.0);
-                    ui.horizontal(|ui| {
-                        ui.add_space(4.0);
-                        ui.add(egui::Label::new(&log).wrap());
+                egui::ScrollArea::vertical()
+                    .id_salt("log")
+                    .stick_to_bottom(true)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.add_space(2.0);
+                        ui.horizontal(|ui| {
+                            ui.add_space(4.0);
+                            ui.add(egui::Label::new(&log).wrap());
+                        });
                     });
-                });
             });
 
             // apply grip and column drags
@@ -1096,10 +1314,36 @@ impl eframe::App for App {
                 ui.label(format!("{}  /  {}", hms(remaining), hms(elapsed)));
                 ui.label("Time Remaining / Elapsed:");
             });
-            let frac = if total > 0 { (done as f32 / total as f32).clamp(0.0, 1.0) } else { 0.0 };
-            let text = if !busy { String::new() } else if total == 0 { label.clone() } else { format!("{label}  {:.0}%", frac * 100.0) };
-            let pr = ui.add(egui::ProgressBar::new(frac).desired_width(ui.available_width()).desired_height(pbh).corner_radius(2.0).fill(if frac > 0.0 { Color32::from_rgb(6, 176, 37) } else { Color32::TRANSPARENT }));
-            ui.painter().text(pr.rect.left_center() + egui::vec2(6.0, 0.0), egui::Align2::LEFT_CENTER, text, egui::TextStyle::Body.resolve(ui.style()), ui.visuals().text_color());
+            let frac = if total > 0 {
+                (done as f32 / total as f32).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let text = if !busy {
+                String::new()
+            } else if total == 0 {
+                label.clone()
+            } else {
+                format!("{label}  {:.0}%", frac * 100.0)
+            };
+            let pr = ui.add(
+                egui::ProgressBar::new(frac)
+                    .desired_width(ui.available_width())
+                    .desired_height(pbh)
+                    .corner_radius(2.0)
+                    .fill(if frac > 0.0 {
+                        Color32::from_rgb(6, 176, 37)
+                    } else {
+                        Color32::TRANSPARENT
+                    }),
+            );
+            ui.painter().text(
+                pr.rect.left_center() + egui::vec2(6.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                text,
+                egui::TextStyle::Body.resolve(ui.style()),
+                ui.visuals().text_color(),
+            );
             ui.add_space(2.0);
             let bs = egui::vec2(130.0 * k, bh);
             ui.horizontal(|ui| {
@@ -1114,15 +1358,26 @@ impl eframe::App for App {
                     .clicked()
                 {
                     self.sh.lock().unwrap().busy = true;
-                    let _ = self.tx.send(Cmd::Scan { names: self.targets(), extended: self.set.extended, save: self.set.use_saved });
+                    let _ = self.tx.send(Cmd::Scan {
+                        names: self.targets(),
+                        extended: self.set.extended,
+                        save: self.set.use_saved,
+                    });
                 }
                 ui.add_space(gap);
-                if ui.add_enabled(!busy && loaded, egui::Button::new("View Report...").min_size(bs)).clicked() {
+                if ui
+                    .add_enabled(!busy && loaded, egui::Button::new("View Report...").min_size(bs))
+                    .clicked()
+                {
                     self.want_report = true;
                     self.report_names = self.targets();
                     self.csel = [0; 4];
                     self.chart_note = None;
-                    let _ = self.tx.send(Cmd::Report { names: self.targets(), diag: self.set.diag, summary: self.set.summary });
+                    let _ = self.tx.send(Cmd::Report {
+                        names: self.targets(),
+                        diag: self.set.diag,
+                        summary: self.set.summary,
+                    });
                 }
                 ui.add_space(gap);
                 if ui.add(egui::Button::new("Settings...").min_size(bs)).clicked() {
@@ -1156,7 +1411,10 @@ impl eframe::App for App {
                     let p = ui.painter();
                     p.circle_filled(r.center(), 22.0, green);
                     let c = r.center();
-                    p.add(egui::Shape::line(vec![c + egui::vec2(-9.0, 1.0), c + egui::vec2(-2.5, 8.0), c + egui::vec2(10.0, -8.0)], egui::Stroke::new(4.0, Color32::WHITE)));
+                    p.add(egui::Shape::line(
+                        vec![c + egui::vec2(-9.0, 1.0), c + egui::vec2(-2.5, 8.0), c + egui::vec2(10.0, -8.0)],
+                        egui::Stroke::new(4.0, Color32::WHITE),
+                    ));
                     ui.add_space(8.0);
                     ui.vertical(|ui| {
                         ui.label(RichText::new("Scan complete").strong().size(20.0));
@@ -1173,7 +1431,8 @@ impl eframe::App for App {
                         close = true;
                     }
                 });
-            }) || close {
+            }) || close
+            {
                 self.scan_msg = None;
             }
         }
@@ -1189,82 +1448,107 @@ impl eframe::App for App {
         if open {
             let (mut ok, mut cancel) = (false, false);
             open = os_window(&ctx, "settings", "Settings", [560.0, 600.0], |ui| {
-            ui.checkbox(&mut self.set.filter_short, "Filter out short playlists");
-            ui.horizontal(|ui| {
-                ui.add_space(24.0);
-                ui.add_enabled_ui(self.set.filter_short, |ui| {
-                    ui.label("Hide playlists shorter than");
-                    let r = ui.add(egui::TextEdit::singleline(&mut self.short_buf).desired_width(56.0).align(egui::Align2::CENTER_CENTER));
-                    if r.changed() {
-                        if let Ok(v) = self.short_buf.trim().parse::<u32>() {
-                            self.set.short_secs = v.min(36000) as f32;
+                ui.checkbox(&mut self.set.filter_short, "Filter out short playlists");
+                ui.horizontal(|ui| {
+                    ui.add_space(24.0);
+                    ui.add_enabled_ui(self.set.filter_short, |ui| {
+                        ui.label("Hide playlists shorter than");
+                        let r = ui.add(
+                            egui::TextEdit::singleline(&mut self.short_buf)
+                                .desired_width(56.0)
+                                .align(egui::Align2::CENTER_CENTER),
+                        );
+                        if r.changed() {
+                            if let Ok(v) = self.short_buf.trim().parse::<u32>() {
+                                self.set.short_secs = v.min(36000) as f32;
+                            }
                         }
-                    }
-                    ui.label("seconds");
+                        ui.label("seconds");
+                    });
                 });
-            });
-            ui.checkbox(&mut self.set.filter_loops, "Filter out looping playlists");
-            ui.checkbox(&mut self.set.human, "Show sizes in human readable format (GB / MB)");
-            ui.checkbox(&mut self.set.diag, "Generate stream diagnostics");
-            ui.checkbox(&mut self.set.summary, "Generate text summary");
-            ui.checkbox(&mut self.set.extended, "Extended HEVC diagnostics (wait for HDR metadata)");
-            ui.separator();
-            ui.label(RichText::new("Saved bitrate scans").strong());
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut self.set.use_saved, "Save bitrate scans and reuse them for the same disc");
-                ui.label(RichText::new("(i)").weak()).on_hover_cursor(egui::CursorIcon::Help).on_hover_text(
-                    "After a bitrate scan finishes, TuxInfo saves the measurements for that disc in the folder below.\n\
+                ui.checkbox(&mut self.set.filter_loops, "Filter out looping playlists");
+                ui.checkbox(&mut self.set.human, "Show sizes in human readable format (GB / MB)");
+                ui.checkbox(&mut self.set.diag, "Generate stream diagnostics");
+                ui.checkbox(&mut self.set.summary, "Generate text summary");
+                ui.checkbox(&mut self.set.extended, "Extended HEVC diagnostics (wait for HDR metadata)");
+                ui.separator();
+                ui.label(RichText::new("Saved bitrate scans").strong());
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut self.set.use_saved, "Save bitrate scans and reuse them for the same disc");
+                    ui.label(RichText::new("(i)").weak())
+                        .on_hover_cursor(egui::CursorIcon::Help)
+                        .on_hover_text(
+                            "After a bitrate scan finishes, TuxInfo saves the measurements for that disc in the folder below.\n\
                      When you open the same disc again (from the drive, a folder or an ISO), they are loaded automatically,\n\
                      so the report and charts are ready without scanning the disc again. The log tells you when this happens.\n\n\
                      Scan Bitrates always measures again and replaces the saved copy. A saved scan is used only if the disc matches\n\
                      and the Extended HEVC diagnostics setting is the same as when it was saved.",
-                );
-            });
-            if let Some(dir) = crate::scancache::dir() {
-                let (n, bytes) = crate::scancache::usage();
-                let used = if n == 0 { "none saved".to_string() } else { format!("{n} saved, {}", num(bytes, true)) };
-                ui.add(egui::Label::new(RichText::new(format!("{}  ({used})", dir.display())).weak()).wrap());
+                        );
+                });
+                if let Some(dir) = crate::scancache::dir() {
+                    let (n, bytes) = crate::scancache::usage();
+                    let used = if n == 0 {
+                        "none saved".to_string()
+                    } else {
+                        format!("{n} saved, {}", num(bytes, true))
+                    };
+                    ui.add(egui::Label::new(RichText::new(format!("{}  ({used})", dir.display())).weak()).wrap());
+                    ui.horizontal(|ui| {
+                        if ui.button("Open folder").clicked() {
+                            let _ = std::fs::create_dir_all(&dir);
+                            #[cfg(windows)]
+                            let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+                            #[cfg(not(windows))]
+                            let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
+                        }
+                        if ui.add_enabled(n > 0, egui::Button::new("Delete all saved scans")).clicked() {
+                            crate::scancache::clear();
+                        }
+                    });
+                }
+                ui.separator();
+                ui.label(RichText::new("Appearance").strong());
                 ui.horizontal(|ui| {
-                    if ui.button("Open folder").clicked() {
-                        let _ = std::fs::create_dir_all(&dir);
-                        #[cfg(windows)]
-                        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
-                        #[cfg(not(windows))]
-                        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
-                    }
-                    if ui.add_enabled(n > 0, egui::Button::new("Delete all saved scans")).clicked() {
-                        crate::scancache::clear();
+                    ui.radio_value(&mut self.set.dark, false, "Light");
+                    ui.radio_value(&mut self.set.dark, true, "Dark");
+                });
+                ui.separator();
+                ui.label(RichText::new("Text size").strong());
+                ui.horizontal(|ui| {
+                    ui.label("Size:");
+                    ui.add(
+                        egui::Slider::new(&mut self.pending, 9.0..=40.0)
+                            .suffix(" pt")
+                            .step_by(1.0)
+                            .fixed_decimals(0),
+                    );
+                    if ui.button("Default").clicked() {
+                        self.pending = 16.0;
                     }
                 });
-            }
-            ui.separator();
-            ui.label(RichText::new("Appearance").strong());
-            ui.horizontal(|ui| {
-                ui.radio_value(&mut self.set.dark, false, "Light");
-                ui.radio_value(&mut self.set.dark, true, "Dark");
-            });
-            ui.separator();
-            ui.label(RichText::new("Text size").strong());
-            ui.horizontal(|ui| {
-                ui.label("Size:");
-                ui.add(egui::Slider::new(&mut self.pending, 9.0..=40.0).suffix(" pt").step_by(1.0).fixed_decimals(0));
-                if ui.button("Default").clicked() {
-                    self.pending = 16.0;
-                }
-            });
-            ui.label("Sample (the window changes when you press OK):");
-            egui::Frame::new().fill(box_fill(ui)).stroke(egui::Stroke::new(1.0, box_edge(ui))).inner_margin(6.0).show(ui, |ui| {
-                ui.set_width(400.0);
-                for t in ["00800.MPLS    01:59:13    35,965,906,944", "MPEG-4 AVC Video    1080p / 23.976 fps / 16:9", "DTS-HD High-Res Audio    English    5.1 / 48 kHz"] {
-                    ui.add(egui::Label::new(RichText::new(t).size(self.pending).color(ui.visuals().text_color())).wrap());
-                }
-            });
-            ui.separator();
-            ui.horizontal(|ui| {
-                ok = ui.add(egui::Button::new("OK").min_size(egui::vec2(90.0, 0.0))).clicked();
-                cancel = ui.add(egui::Button::new("Cancel").min_size(egui::vec2(90.0, 0.0))).clicked();
-            });
-            ui.add(egui::Label::new(RichText::new("OK keeps your changes. Cancel, or closing this window, undoes them.").weak()).wrap());
+                ui.label("Sample (the window changes when you press OK):");
+                egui::Frame::new()
+                    .fill(box_fill(ui))
+                    .stroke(egui::Stroke::new(1.0, box_edge(ui)))
+                    .inner_margin(6.0)
+                    .show(ui, |ui| {
+                        ui.set_width(400.0);
+                        for t in [
+                            "00800.MPLS    01:59:13    35,965,906,944",
+                            "MPEG-4 AVC Video    1080p / 23.976 fps / 16:9",
+                            "DTS-HD High-Res Audio    English    5.1 / 48 kHz",
+                        ] {
+                            ui.add(egui::Label::new(RichText::new(t).size(self.pending).color(ui.visuals().text_color())).wrap());
+                        }
+                    });
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ok = ui.add(egui::Button::new("OK").min_size(egui::vec2(90.0, 0.0))).clicked();
+                    cancel = ui.add(egui::Button::new("Cancel").min_size(egui::vec2(90.0, 0.0))).clicked();
+                });
+                ui.add(
+                    egui::Label::new(RichText::new("OK keeps your changes. Cancel, or closing this window, undoes them.").weak()).wrap(),
+                );
             });
             if ok {
                 self.set.font = self.pending;
@@ -1282,42 +1566,110 @@ impl eframe::App for App {
             let mut check = false;
             let busy = upd.lock().unwrap().starts_with("Checking");
             let has_repo = !crate::app_info::REPO_URL.is_empty();
-            self.show_about = os_window(&ctx, "about", "About TuxInfo", [560.0, 470.0], |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(4.0);
-                    ui.heading("TuxInfo");
-                    ui.label(format!("Version {}", crate::app_info::version()));
-                    ui.label("Blu-ray and Ultra HD disc analyzer");
+            let mut close = false;
+            let logo = self
+                .logo
+                .get_or_insert_with(|| {
+                    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../packaging/icons/tuxinfo-256.png")).unwrap_or_default();
+                    let img = egui::ColorImage::from_rgba_unmultiplied([icon.width as usize, icon.height as usize], &icon.rgba);
+                    ctx.load_texture("tuxinfo-logo", img, egui::TextureOptions::LINEAR)
+                })
+                .clone();
+            let open = os_window(&ctx, "about", "About TuxInfo", [540.0, 650.0], |ui| {
+                let card = |ui: &mut egui::Ui, title: &str, f: &mut dyn FnMut(&mut egui::Ui)| {
+                    egui::Frame::new()
+                        .fill(ui.visuals().faint_bg_color)
+                        .stroke(egui::Stroke::new(1.0, box_edge(ui)))
+                        .corner_radius(6.0)
+                        .inner_margin(egui::Margin::symmetric(14, 10))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(RichText::new(title).strong().size(15.0));
+                            ui.add_space(4.0);
+                            f(ui);
+                        });
+                    ui.add_space(8.0);
+                };
+                ui.spacing_mut().item_spacing.y = 6.0;
+                const LOGO: f32 = 104.0;
+                const PAD: f32 = 16.0;
+                ui.horizontal_top(|ui| {
+                    let text_w = (ui.available_width() - LOGO - PAD - ui.spacing().item_spacing.x * 2.0).max(0.0);
+                    ui.allocate_ui_with_layout(egui::vec2(text_w, 0.0), egui::Layout::top_down(egui::Align::Center), |ui| {
+                        ui.add_space(10.0);
+                        ui.label(RichText::new("TuxInfo").strong().size(32.0));
+                        ui.label(RichText::new(format!("Version {}", crate::app_info::version())).size(15.0));
+                        ui.label(RichText::new("Blu-ray and Ultra HD disc analyzer").weak());
+                        ui.add_space(8.0);
+                        if has_repo {
+                            ui.hyperlink_to(crate::app_info::REPO_URL, crate::app_info::REPO_URL);
+                        } else {
+                            ui.label(RichText::new("The repository address will be added here.").weak());
+                        }
+                    });
+                    ui.vertical(|ui| {
+                        ui.add_space(PAD);
+                        ui.add(egui::Image::new(&logo).fit_to_exact_size(egui::vec2(LOGO, LOGO)));
+                    });
                 });
-                ui.separator();
-                ui.label(RichText::new("Home").strong());
-                ui.add(egui::Label::new(if has_repo { crate::app_info::REPO_URL } else { "The repository address will be added here." }).selectable(true));
-                ui.separator();
-                ui.label(RichText::new("Credits").strong());
-                ui.add(egui::Label::new("TuxInfo is based on BDInfo, the Blu-ray disc analyzer by Cinema Squid, continued by the UniqProject developers (https://github.com/UniqProject/BDInfo). BDInfo is licensed under the LGPL-2.1; TuxInfo is a derivative work and is released under the same license.").wrap().selectable(true));
-                ui.add_space(4.0);
-                ui.add(egui::Label::new("Encrypted discs are read with libbluray and MakeMKV's libmmbd. The preview is played by libmpv (which uses FFmpeg). This window is drawn with egui.").wrap());
-                ui.separator();
-                ui.label(RichText::new("Updates").strong());
-                ui.horizontal(|ui| {
-                    if ui.add_enabled(has_repo && !busy, egui::Button::new("Check for updates")).clicked() {
-                        check = true;
-                    }
-                    let msg = upd.lock().unwrap().clone();
-                    if !has_repo {
-                        ui.label(RichText::new("Available once the repository address is set.").weak());
-                    } else {
-                        ui.add(egui::Label::new(msg).wrap());
+                ui.add_space(10.0);
+                card(ui, "About", &mut |ui| {
+                    ui.add(egui::Label::new("TuxInfo is based on BDInfo, the Blu-ray disc analyzer by Cinema Squid, continued by the UniqProject developers.").wrap());
+                    ui.hyperlink_to("github.com/UniqProject/BDInfo", "https://github.com/UniqProject/BDInfo");
+                });
+                card(ui, "License", &mut |ui| {
+                    ui.add(
+                        egui::Label::new(
+                            "BDInfo is licensed under the LGPL-2.1. TuxInfo is a derivative work and is released under the same license.",
+                        )
+                        .wrap(),
+                    );
+                });
+                card(ui, "Built with", &mut |ui| {
+                    egui::Grid::new("about_libs").num_columns(2).spacing([16.0, 4.0]).show(ui, |ui| {
+                        for (n, d) in [
+                            ("libbluray + libmmbd", "reads encrypted discs"),
+                            ("libmpv (FFmpeg)", "plays the preview"),
+                            ("egui", "draws this window"),
+                        ] {
+                            ui.label(RichText::new(n).strong());
+                            ui.label(RichText::new(d).weak());
+                            ui.end_row();
+                        }
+                    });
+                });
+                card(ui, "Updates", &mut |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.add_enabled(has_repo && !busy, egui::Button::new("Check for updates")).clicked() {
+                            check = true;
+                        }
+                        let msg = upd.lock().unwrap().clone();
+                        if !has_repo {
+                            ui.label(RichText::new("Available once the repository address is set.").weak());
+                        } else {
+                            ui.add(egui::Label::new(msg).wrap());
+                        }
+                    });
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.add(egui::Button::new("Close").min_size(egui::vec2(96.0, 30.0))).clicked()
+                        || ui.input(|i| i.key_pressed(egui::Key::Escape))
+                    {
+                        close = true;
                     }
                 });
             });
+            self.show_about = open && !close;
             if check {
                 *upd.lock().unwrap() = "Checking...".into();
                 let ctx2 = ctx.clone();
                 std::thread::spawn(move || {
                     let m = match crate::app_info::check() {
                         Ok(crate::app_info::Update::Current) => format!("You have the latest version ({}).", crate::app_info::version()),
-                        Ok(crate::app_info::Update::Newer(t)) => format!("Version {t} is available: {}/releases", crate::app_info::REPO_URL.trim_end_matches('/')),
+                        Ok(crate::app_info::Update::Newer(t)) => format!(
+                            "Version {t} is available: {}/releases",
+                            crate::app_info::REPO_URL.trim_end_matches('/')
+                        ),
                         Err(e) => e,
                     };
                     *upd.lock().unwrap() = m;
@@ -1341,52 +1693,65 @@ impl eframe::App for App {
                 let find = |n: &str| rows.iter().find(|r| r.name == n);
                 let compatible = |p: &PlRow, target: &[(String, usize)]| {
                     target.iter().filter_map(|(n, i)| find(n).and_then(|r| r.clips.get(*i))).all(|t| {
-                        p.clips.iter().all(|c| c.types.iter().all(|(pid, ty)| t.types.iter().all(|(p2, t2)| pid != p2 || ty == t2)))
+                        p.clips
+                            .iter()
+                            .all(|c| c.types.iter().all(|(pid, ty)| t.types.iter().all(|(p2, t2)| pid != p2 || ty == t2)))
                     })
                 };
                 let hh = (ui.available_height() - 80.0).max(120.0);
                 ui.columns(2, |cols| {
                     let ui = &mut cols[0];
                     ui.strong("Playlists");
-                    egui::ScrollArea::vertical().id_salt("cp_pl").max_height(hh * 0.5 - 24.0).auto_shrink([false, false]).show(ui, |ui| {
-                        egui::Grid::new("cp_pl_grid").num_columns(3).spacing([14.0, 2.0]).show(ui, |ui| {
-                            for r in rows.iter() {
-                                if cd.filter && !cd.target.is_empty() && !compatible(r, &cd.target) {
-                                    continue;
-                                }
-                                let sel = cd.pl.as_deref() == Some(r.name.as_str());
-                                let mut hit = ui.selectable_label(sel, &r.name).clicked();
-                                hit |= ui.selectable_label(sel, hms(r.len)).clicked();
-                                hit |= ui.selectable_label(sel, num(r.est, human)).clicked();
-                                ui.end_row();
-                                if hit && !sel {
-                                    cd.pl = Some(r.name.clone());
-                                    cd.clip = None;
-                                }
-                            }
-                        });
-                    });
-                    ui.add_space(4.0);
-                    ui.strong("Stream files of the selected playlist");
-                    let cur = cd.pl.as_deref().and_then(find);
-                    egui::ScrollArea::vertical().id_salt("cp_cl").max_height(hh * 0.5 - 56.0).auto_shrink([false, false]).show(ui, |ui| {
-                        if let Some(r) = cur {
-                            egui::Grid::new("cp_cl_grid").num_columns(3).spacing([14.0, 2.0]).show(ui, |ui| {
-                                for (i, c) in r.clips.iter().enumerate() {
-                                    let sel = cd.clip == Some(i);
-                                    let mut hit = ui.selectable_label(sel, &c.name).clicked();
-                                    hit |= ui.selectable_label(sel, hms(c.len)).clicked();
-                                    hit |= ui.selectable_label(sel, num(c.est, human)).clicked();
+                    egui::ScrollArea::vertical()
+                        .id_salt("cp_pl")
+                        .max_height(hh * 0.5 - 24.0)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            egui::Grid::new("cp_pl_grid").num_columns(3).spacing([14.0, 2.0]).show(ui, |ui| {
+                                for r in rows.iter() {
+                                    if cd.filter && !cd.target.is_empty() && !compatible(r, &cd.target) {
+                                        continue;
+                                    }
+                                    let sel = cd.pl.as_deref() == Some(r.name.as_str());
+                                    let mut hit = ui.selectable_label(sel, &r.name).clicked();
+                                    hit |= ui.selectable_label(sel, hms(r.len)).clicked();
+                                    hit |= ui.selectable_label(sel, num(r.est, human)).clicked();
                                     ui.end_row();
-                                    if hit {
-                                        cd.clip = Some(i);
+                                    if hit && !sel {
+                                        cd.pl = Some(r.name.clone());
+                                        cd.clip = None;
                                     }
                                 }
                             });
-                        }
-                    });
+                        });
+                    ui.add_space(4.0);
+                    ui.strong("Stream files of the selected playlist");
+                    let cur = cd.pl.as_deref().and_then(find);
+                    egui::ScrollArea::vertical()
+                        .id_salt("cp_cl")
+                        .max_height(hh * 0.5 - 56.0)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            if let Some(r) = cur {
+                                egui::Grid::new("cp_cl_grid").num_columns(3).spacing([14.0, 2.0]).show(ui, |ui| {
+                                    for (i, c) in r.clips.iter().enumerate() {
+                                        let sel = cd.clip == Some(i);
+                                        let mut hit = ui.selectable_label(sel, &c.name).clicked();
+                                        hit |= ui.selectable_label(sel, hms(c.len)).clicked();
+                                        hit |= ui.selectable_label(sel, num(c.est, human)).clicked();
+                                        ui.end_row();
+                                        if hit {
+                                            cd.clip = Some(i);
+                                        }
+                                    }
+                                });
+                            }
+                        });
                     ui.horizontal(|ui| {
-                        if ui.add_enabled(cur.is_some() && cd.clip.is_some(), egui::Button::new("Add >")).clicked() {
+                        if ui
+                            .add_enabled(cur.is_some() && cd.clip.is_some(), egui::Button::new("Add >"))
+                            .clicked()
+                        {
                             if let (Some(r), Some(i)) = (cur, cd.clip) {
                                 cd.target.push((r.name.clone(), i));
                             }
@@ -1400,21 +1765,27 @@ impl eframe::App for App {
 
                     let ui = &mut cols[1];
                     ui.strong("New playlist");
-                    egui::ScrollArea::vertical().id_salt("cp_tg").max_height(hh - 24.0).auto_shrink([false, false]).show(ui, |ui| {
-                        egui::Grid::new("cp_tg_grid").num_columns(3).spacing([14.0, 2.0]).show(ui, |ui| {
-                            for (i, (pn, ci)) in cd.target.iter().enumerate() {
-                                let Some(c) = find(pn).and_then(|r| r.clips.get(*ci)) else { continue };
-                                let sel = cd.tsel == Some(i);
-                                let mut hit = ui.selectable_label(sel, &c.name).clicked();
-                                hit |= ui.selectable_label(sel, hms(c.len)).clicked();
-                                hit |= ui.selectable_label(sel, num(c.est, human)).clicked();
-                                ui.end_row();
-                                if hit {
-                                    cd.tsel = Some(i);
+                    egui::ScrollArea::vertical()
+                        .id_salt("cp_tg")
+                        .max_height(hh - 24.0)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            egui::Grid::new("cp_tg_grid").num_columns(3).spacing([14.0, 2.0]).show(ui, |ui| {
+                                for (i, (pn, ci)) in cd.target.iter().enumerate() {
+                                    let Some(c) = find(pn).and_then(|r| r.clips.get(*ci)) else {
+                                        continue;
+                                    };
+                                    let sel = cd.tsel == Some(i);
+                                    let mut hit = ui.selectable_label(sel, &c.name).clicked();
+                                    hit |= ui.selectable_label(sel, hms(c.len)).clicked();
+                                    hit |= ui.selectable_label(sel, num(c.est, human)).clicked();
+                                    ui.end_row();
+                                    if hit {
+                                        cd.tsel = Some(i);
+                                    }
                                 }
-                            }
+                            });
                         });
-                    });
                     ui.horizontal(|ui| {
                         let n = cd.target.len();
                         let s = cd.tsel.filter(|&i| i < n);
@@ -1440,7 +1811,10 @@ impl eframe::App for App {
                 });
                 ui.separator();
                 ui.horizontal(|ui| {
-                    if ui.add_enabled(!cd.target.is_empty() && !cd.name.trim().is_empty(), egui::Button::new("OK")).clicked() {
+                    if ui
+                        .add_enabled(!cd.target.is_empty() && !cd.name.trim().is_empty(), egui::Button::new("OK"))
+                        .clicked()
+                    {
                         ok = true;
                     }
                     if ui.button("Cancel").clicked() {
@@ -1449,7 +1823,10 @@ impl eframe::App for App {
                 });
             });
             if ok {
-                let _ = self.tx.send(Cmd::Custom { name: cd.name.trim().to_uppercase(), items: cd.target.clone() });
+                let _ = self.tx.send(Cmd::Custom {
+                    name: cd.name.trim().to_uppercase(),
+                    items: cd.target.clone(),
+                });
             }
             self.show_custom = keep && !ok && !cancel;
             self.cd = cd;
@@ -1459,14 +1836,32 @@ impl eframe::App for App {
             // its own window, so it can be moved outside the program window (an embedded window where that is not supported)
             let (mut keep, mut rf, mut rw) = (true, self.set.report_font, self.set.report_wrap);
             let rows = self.rows.clone();
-            let pls: Vec<&PlRow> = self.report_names.iter().filter_map(|n| rows.iter().find(|r| &r.name == n)).collect();
+            let pls: Vec<&PlRow> = self
+                .report_names
+                .iter()
+                .filter_map(|n| rows.iter().find(|r| &r.name == n))
+                .collect();
             let mut cs = self.csel;
             let mut gen_chart: Option<(String, u16, usize, usize)> = None;
             let note = self.chart_note.clone();
-            let (text, name) = (&self.report, format!("TuxInfo.{}.txt", self.src.trim_end_matches(['/', '\\']).rsplit(['/', '\\']).next().unwrap_or("report")));
+            let (text, name) = (
+                &self.report,
+                format!(
+                    "TuxInfo.{}.txt",
+                    self.src
+                        .trim_end_matches(['/', '\\'])
+                        .rsplit(['/', '\\'])
+                        .next()
+                        .unwrap_or("report")
+                ),
+            );
             ctx.show_viewport_immediate(
                 egui::ViewportId::from_hash_of("report"),
-                egui::ViewportBuilder::default().with_title("TuxInfo Report").with_app_id("tuxinfo").with_inner_size([900.0, 640.0]).with_min_inner_size([420.0, 260.0]),
+                egui::ViewportBuilder::default()
+                    .with_title("TuxInfo Report")
+                    .with_app_id("tuxinfo")
+                    .with_inner_size([900.0, 640.0])
+                    .with_min_inner_size([420.0, 260.0]),
                 |ui, _class| {
                     if ui.ctx().input(|i| i.viewport().close_requested()) {
                         keep = false;
@@ -1476,7 +1871,11 @@ impl eframe::App for App {
                         rf = (rf * zoom).round().clamp(8.0, 48.0);
                     }
                     egui::Frame::central_panel(ui.style()).show(ui, |ui| {
-                        ui.spacing_mut().scroll = egui::style::ScrollStyle { bar_width: 13.0, foreground_color: true, ..egui::style::ScrollStyle::solid() };
+                        ui.spacing_mut().scroll = egui::style::ScrollStyle {
+                            bar_width: 13.0,
+                            foreground_color: true,
+                            ..egui::style::ScrollStyle::solid()
+                        };
                         let t = track_color(ui);
                         ui.visuals_mut().extreme_bg_color = t;
                         ui.spacing_mut().item_spacing = egui::vec2(10.0, 8.0);
@@ -1504,58 +1903,83 @@ impl eframe::App for App {
                             });
                         });
                         if !pls.is_empty() {
-                          egui::CollapsingHeader::new("Bitrate charts").default_open(true).show(ui, |ui| {
-                            cs[0] = cs[0].min(pls.len() - 1);
-                            let prev = cs[0];
-                            let n_before = pls[cs[0]];
-                            ui.horizontal(|ui| {
-                                ui.spacing_mut().item_spacing.x = 8.0;
-                                ui.label("Chart:");
-                                egui::ComboBox::from_id_salt("chart_pl").width(96.0).selected_text(n_before.name.as_str()).show_ui(ui, |ui| {
-                                    for (i, p) in pls.iter().enumerate() {
-                                        ui.selectable_value(&mut cs[0], i, p.name.as_str());
+                            egui::CollapsingHeader::new("Bitrate charts").default_open(true).show(ui, |ui| {
+                                cs[0] = cs[0].min(pls.len() - 1);
+                                let prev = cs[0];
+                                let n_before = pls[cs[0]];
+                                ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 8.0;
+                                    ui.label("Chart:");
+                                    egui::ComboBox::from_id_salt("chart_pl")
+                                        .width(96.0)
+                                        .selected_text(n_before.name.as_str())
+                                        .show_ui(ui, |ui| {
+                                            for (i, p) in pls.iter().enumerate() {
+                                                ui.selectable_value(&mut cs[0], i, p.name.as_str());
+                                            }
+                                        });
+                                    if cs[0] != prev {
+                                        cs[1] = 0;
+                                        cs[2] = 0;
+                                    }
+                                    let p = pls[cs[0]];
+                                    cs[1] = cs[1].min(p.vids.len().saturating_sub(1));
+                                    cs[2] = cs[2].min(p.angles);
+                                    egui::ComboBox::from_id_salt("chart_st")
+                                        .width(190.0)
+                                        .selected_text(p.vids.get(cs[1]).map_or("(no video)".to_string(), |v| v.1.replace(" Video", "")))
+                                        .show_ui(ui, |ui| {
+                                            for (i, v) in p.vids.iter().enumerate() {
+                                                ui.selectable_value(&mut cs[1], i, v.1.replace(" Video", ""));
+                                            }
+                                        });
+                                    ui.label("Angle:");
+                                    egui::ComboBox::from_id_salt("chart_an")
+                                        .width(36.0)
+                                        .selected_text(cs[2].to_string())
+                                        .show_ui(ui, |ui| {
+                                            for a in 0..=p.angles {
+                                                ui.selectable_value(&mut cs[2], a, a.to_string());
+                                            }
+                                        });
+                                    egui::ComboBox::from_id_salt("chart_ty")
+                                        .width(190.0)
+                                        .selected_text(crate::chart::TYPES[cs[3].min(5)].trim_start_matches("Video "))
+                                        .show_ui(ui, |ui| {
+                                            for (i, t) in crate::chart::TYPES.iter().enumerate() {
+                                                ui.selectable_value(&mut cs[3], i, t.trim_start_matches("Video "));
+                                            }
+                                        });
+                                    if ui
+                                        .add_enabled(!p.vids.is_empty(), egui::Button::new("Generate"))
+                                        .on_hover_text("Open the chart in its own window")
+                                        .clicked()
+                                    {
+                                        gen_chart = Some((p.name.clone(), p.vids[cs[1]].0, cs[2], cs[3]));
                                     }
                                 });
-                                if cs[0] != prev {
-                                    cs[1] = 0;
-                                    cs[2] = 0;
-                                }
-                                let p = pls[cs[0]];
-                                cs[1] = cs[1].min(p.vids.len().saturating_sub(1));
-                                cs[2] = cs[2].min(p.angles);
-                                egui::ComboBox::from_id_salt("chart_st").width(190.0).selected_text(p.vids.get(cs[1]).map_or("(no video)".to_string(), |v| v.1.replace(" Video", ""))).show_ui(ui, |ui| {
-                                    for (i, v) in p.vids.iter().enumerate() {
-                                        ui.selectable_value(&mut cs[1], i, v.1.replace(" Video", ""));
-                                    }
-                                });
-                                ui.label("Angle:");
-                                egui::ComboBox::from_id_salt("chart_an").width(36.0).selected_text(cs[2].to_string()).show_ui(ui, |ui| {
-                                    for a in 0..=p.angles {
-                                        ui.selectable_value(&mut cs[2], a, a.to_string());
-                                    }
-                                });
-                                egui::ComboBox::from_id_salt("chart_ty").width(190.0).selected_text(crate::chart::TYPES[cs[3].min(5)].trim_start_matches("Video ")).show_ui(ui, |ui| {
-                                    for (i, t) in crate::chart::TYPES.iter().enumerate() {
-                                        ui.selectable_value(&mut cs[3], i, t.trim_start_matches("Video "));
-                                    }
-                                });
-                                if ui.add_enabled(!p.vids.is_empty(), egui::Button::new("Generate")).on_hover_text("Open the chart in its own window").clicked() {
-                                    gen_chart = Some((p.name.clone(), p.vids[cs[1]].0, cs[2], cs[3]));
+                                if let Some(n) = &note {
+                                    ui.colored_label(Color32::from_rgb(200, 60, 40), n.as_str());
                                 }
                             });
-                            if let Some(n) = &note {
-                                ui.colored_label(Color32::from_rgb(200, 60, 40), n.as_str());
-                            }
-                          });
                         }
                         ui.add_space(4.0);
-                        egui::Frame::new().fill(box_fill(ui)).stroke(egui::Stroke::new(1.0, box_edge(ui))).show(ui, |ui| {
-                            let area = if rw { egui::ScrollArea::vertical() } else { egui::ScrollArea::both() };
-                            area.auto_shrink([false, false]).show(ui, |ui| {
-                                let label = egui::Label::new(RichText::new(text.as_str()).monospace().size(rf).color(ui.visuals().text_color()));
-                                ui.add(if rw { label.wrap() } else { label.extend() });
+                        egui::Frame::new()
+                            .fill(box_fill(ui))
+                            .stroke(egui::Stroke::new(1.0, box_edge(ui)))
+                            .show(ui, |ui| {
+                                let area = if rw {
+                                    egui::ScrollArea::vertical()
+                                } else {
+                                    egui::ScrollArea::both()
+                                };
+                                area.auto_shrink([false, false]).show(ui, |ui| {
+                                    let label = egui::Label::new(
+                                        RichText::new(text.as_str()).monospace().size(rf).color(ui.visuals().text_color()),
+                                    );
+                                    ui.add(if rw { label.wrap() } else { label.extend() });
+                                });
                             });
-                        });
                     });
                 },
             );
@@ -1577,7 +2001,11 @@ impl eframe::App for App {
                 let mut keep = true;
                 ctx.show_viewport_immediate(
                     egui::ViewportId::from_hash_of(("chart", w.id)),
-                    egui::ViewportBuilder::default().with_title(w.ch.window_title.as_str()).with_app_id("tuxinfo").with_inner_size([960.0, 600.0]).with_min_inner_size([420.0, 300.0]),
+                    egui::ViewportBuilder::default()
+                        .with_title(w.ch.window_title.as_str())
+                        .with_app_id("tuxinfo")
+                        .with_inner_size([960.0, 600.0])
+                        .with_min_inner_size([420.0, 300.0]),
                     |ui, _class| {
                         if ui.ctx().input(|i| i.viewport().close_requested()) {
                             keep = false;
@@ -1604,7 +2032,11 @@ impl eframe::App for App {
                             ui.label(status);
                         });
                         if save {
-                            if let Some(path) = rfd::FileDialog::new().set_file_name(w.ch.file.as_str()).add_filter("PNG image", &["png"]).save_file() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .set_file_name(w.ch.file.as_str())
+                                .add_filter("PNG image", &["png"])
+                                .save_file()
+                            {
                                 let ppp = ui.ctx().pixels_per_point();
                                 ui.ctx().request_screenshot(move |img| {
                                     let [iw, ih] = img.size;
@@ -1639,7 +2071,9 @@ impl eframe::App for App {
 fn default_source() -> Option<String> {
     #[cfg(windows)]
     {
-        return ('D'..='Z').map(|l| format!("{l}:\\")).find(|p| Path::new(&format!("{p}BDMV")).exists());
+        return ('D'..='Z')
+            .map(|l| format!("{l}:\\"))
+            .find(|p| Path::new(&format!("{p}BDMV")).exists());
     }
     #[cfg(not(windows))]
     {
@@ -1648,7 +2082,8 @@ fn default_source() -> Option<String> {
         for l in mounts.lines() {
             let mut f = l.split_whitespace();
             let (dev, dir, fs) = (f.next().unwrap_or(""), f.next().unwrap_or(""), f.next().unwrap_or(""));
-            let optical = dev.starts_with("/dev/sr") || dev.starts_with("/dev/scd") || dev.starts_with("/dev/cdrom") || dev.starts_with("/dev/dvd");
+            let optical =
+                dev.starts_with("/dev/sr") || dev.starts_with("/dev/scd") || dev.starts_with("/dev/cdrom") || dev.starts_with("/dev/dvd");
             if optical && matches!(fs, "udf" | "iso9660") {
                 found.push(dir.replace("\\040", " "));
             }
@@ -1657,7 +2092,10 @@ fn default_source() -> Option<String> {
         if let Some(d) = found.iter().find(|d| Path::new(d).join("BDMV").exists()).or(found.first()) {
             return Some(d.clone());
         }
-        ["/dev/sr0", "/dev/sr1", "/dev/cdrom", "/dev/dvd"].iter().find(|p| Path::new(p).exists()).map(|p| p.to_string())
+        ["/dev/sr0", "/dev/sr1", "/dev/cdrom", "/dev/dvd"]
+            .iter()
+            .find(|p| Path::new(p).exists())
+            .map(|p| p.to_string())
     }
 }
 
@@ -1672,7 +2110,9 @@ pub fn run(initial: Option<String>) {
             .with_title("TuxInfo")
             .with_app_id("tuxinfo")
             .with_icon(eframe::icon_data::from_png_bytes(include_bytes!("../packaging/icons/tuxinfo-256.png")).unwrap_or_default())
-            .with_inner_size([900.0, 960.0]).with_min_inner_size([560.0, 460.0]).with_drag_and_drop(true),
+            .with_inner_size([900.0, 960.0])
+            .with_min_inner_size([560.0, 460.0])
+            .with_drag_and_drop(true),
         ..Default::default()
     };
     let (sh2, cancel2) = (sh.clone(), cancel.clone());
@@ -1710,11 +2150,16 @@ pub fn run(initial: Option<String>) {
                 snap: Settings::load(),
                 themed: Settings::load().dark,
                 show_about: false,
+                logo: None,
                 upd: Arc::new(Mutex::new(String::new())),
                 styled: 0.0,
                 pending: Settings::load().font,
                 wts: [96.0 / 404.0, 100.0 / 404.0, 150.0 / 404.0, 58.0 / 404.0],
-                cols: [vec![0.22, 0.09, 0.14, 0.28, 0.27], vec![0.22, 0.09, 0.14, 0.28, 0.27], vec![0.30, 0.17, 0.15, 0.38]],
+                cols: [
+                    vec![0.22, 0.09, 0.14, 0.28, 0.27],
+                    vec![0.22, 0.09, 0.14, 0.28, 0.27],
+                    vec![0.30, 0.17, 0.15, 0.38],
+                ],
                 opened: false,
                 watch,
                 gone,
@@ -1786,6 +2231,7 @@ fn medium_present(src: &str) -> bool {
             }
             if let Ok(f) = std::fs::OpenOptions::new().read(true).custom_flags(0o4000).open(&dev) {
                 // CDROM_DRIVE_STATUS = 0x5326, slot argument CDSL_CURRENT = i32::MAX
+                // SAFETY: `f` is an open file descriptor for the whole call and this request takes one integer argument.
                 let st = unsafe { ioctl(f.as_raw_fd(), 0x5326, i32::MAX) };
                 if st == 1 || st == 2 {
                     // CDS_NO_DISC / CDS_TRAY_OPEN
@@ -1800,11 +2246,18 @@ fn medium_present(src: &str) -> bool {
 /// A real OS window (can leave the main window) whose contents are drawn by `f`; false once closed.
 pub(crate) fn os_window(ctx: &egui::Context, id: &str, title: &str, size: [f32; 2], mut f: impl FnMut(&mut egui::Ui)) -> bool {
     let mut open = true;
-    ctx.show_viewport_immediate(egui::ViewportId::from_hash_of(id), egui::ViewportBuilder::default().with_title(title).with_inner_size(size), |ctx, _| {
-        egui::CentralPanel::default().show(ctx, |ui| f(ui));
-        if ctx.input(|i| i.viewport().close_requested()) {
-            open = false;
-        }
-    });
+    ctx.show_viewport_immediate(
+        egui::ViewportId::from_hash_of(id),
+        egui::ViewportBuilder::default()
+            .with_title(title)
+            .with_app_id("tuxinfo")
+            .with_inner_size(size),
+        |ctx, _| {
+            egui::CentralPanel::default().show(ctx, |ui| f(ui));
+            if ctx.input(|i| i.viewport().close_requested()) {
+                open = false;
+            }
+        },
+    );
     open
 }

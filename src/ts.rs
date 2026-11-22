@@ -81,7 +81,16 @@ pub fn scan_file(
     f.diag.clear();
     f.length = 0.0;
     let targets: Vec<(usize, usize)> = if full {
-        sel.iter().flat_map(|&p| pls[p].clips.iter().enumerate().filter(|(_, c)| c.name == f.name).map(move |(i, _)| (p, i))).collect()
+        sel.iter()
+            .flat_map(|&p| {
+                pls[p]
+                    .clips
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.name == f.name)
+                    .map(move |(i, _)| (p, i))
+            })
+            .collect()
     } else {
         Vec::new()
     };
@@ -238,9 +247,28 @@ impl Ctx<'_> {
             let info = (((s[k + 3] & 0xF) as usize) << 8) | s[k + 4] as usize;
             let known = matches!(
                 t,
-                MVC_VIDEO | AVC_VIDEO | HEVC_VIDEO | MPEG1_VIDEO | MPEG2_VIDEO | VC1_VIDEO | AC3_AUDIO | AC3_PLUS_AUDIO
-                    | AC3_PLUS_SECONDARY | TRUEHD_AUDIO | DTS_AUDIO | DTS_HD_AUDIO | DTS_HD_MASTER_AUDIO | DTS_HD_SECONDARY
-                    | LPCM_AUDIO | MPEG1_AUDIO | MPEG2_AUDIO | MPEG2_AAC | MPEG4_AAC | IGS | PGS | SUBTITLE
+                MVC_VIDEO
+                    | AVC_VIDEO
+                    | HEVC_VIDEO
+                    | MPEG1_VIDEO
+                    | MPEG2_VIDEO
+                    | VC1_VIDEO
+                    | AC3_AUDIO
+                    | AC3_PLUS_AUDIO
+                    | AC3_PLUS_SECONDARY
+                    | TRUEHD_AUDIO
+                    | DTS_AUDIO
+                    | DTS_HD_AUDIO
+                    | DTS_HD_MASTER_AUDIO
+                    | DTS_HD_SECONDARY
+                    | LPCM_AUDIO
+                    | MPEG1_AUDIO
+                    | MPEG2_AUDIO
+                    | MPEG2_AAC
+                    | MPEG4_AAC
+                    | IGS
+                    | PGS
+                    | SUBTITLE
             );
             if known && !self.f.streams.contains(pid) {
                 let mut st = Stream::new(pid, t);
@@ -333,7 +361,11 @@ impl Ctx<'_> {
         let keep = !s.initialized || s.is_video() || s.is_graphics();
         let cap = if s.initialized && s.is_video() { 16 << 10 } else { 64 << 20 };
         let st = &mut self.states[idx];
-        let take = if st.variable { d.len() } else { d.len().min(st.remain.max(0) as usize) };
+        let take = if st.variable {
+            d.len()
+        } else {
+            d.len().min(st.remain.max(0) as usize)
+        };
         if keep && st.buf.len() < cap {
             let n = take.min(cap - st.buf.len());
             st.buf.extend_from_slice(&d[..n]);

@@ -139,7 +139,10 @@ unsafe extern "C" fn get_proc(_: *mut c_void, name: *const c_char) -> *mut c_voi
 unsafe fn find_proc() -> bool {
     let egl = lib(&["libEGL.so.1"]);
     if !egl.is_null() {
-        if let (Ok(cur), Ok(gp)) = (sym::<unsafe extern "C" fn() -> *mut c_void>(egl, "eglGetCurrentContext"), sym::<usize>(egl, "eglGetProcAddress")) {
+        if let (Ok(cur), Ok(gp)) = (
+            sym::<unsafe extern "C" fn() -> *mut c_void>(egl, "eglGetCurrentContext"),
+            sym::<usize>(egl, "eglGetProcAddress"),
+        ) {
             if !cur().is_null() {
                 PROC_FN.store(gp, Ordering::Relaxed);
                 PROC_EGL.store(true, Ordering::Relaxed);
@@ -201,7 +204,11 @@ mod cb {
     }
     unsafe extern "C" fn seek(c: *mut c_void, off: i64) -> i64 {
         let r = (*(c as *mut Stream)).seek(off);
-        if r < 0 { -20 } else { r }
+        if r < 0 {
+            -20
+        } else {
+            r
+        }
     }
     unsafe extern "C" fn size(c: *mut c_void) -> i64 {
         (*(c as *mut Stream)).size()
@@ -228,7 +235,9 @@ fn hwdec_list() -> String {
         if !n.starts_with("card") || n.contains('-') {
             continue;
         }
-        let Ok(v) = std::fs::read_to_string(e.path().join("device/vendor")) else { continue };
+        let Ok(v) = std::fs::read_to_string(e.path().join("device/vendor")) else {
+            continue;
+        };
         let v = v.trim().trim_start_matches("0x").to_ascii_lowercase();
         if seen.contains(&v) {
             continue;
@@ -240,7 +249,11 @@ fn hwdec_list() -> String {
         }
         seen.push(v);
     }
-    if list.is_empty() { "auto-safe".into() } else { list.join(",") }
+    if list.is_empty() {
+        "auto-safe".into()
+    } else {
+        list.join(",")
+    }
 }
 
 /// What to play.
@@ -330,7 +343,18 @@ impl Player {
             (api.add_ro)(h, c"tuxbd".as_ptr(), null_mut(), cb::open);
             let lv = CString::new("warn").unwrap();
             (api.log_level)(h, lv.as_ptr());
-            Ok(Player { api, h, rc: null_mut(), rc_failed: false, pending: None, fbo: None, st: Status { volume: 100.0, ..Default::default() } })
+            Ok(Player {
+                api,
+                h,
+                rc: null_mut(),
+                rc_failed: false,
+                pending: None,
+                fbo: None,
+                st: Status {
+                    volume: 100.0,
+                    ..Default::default()
+                },
+            })
         }
     }
 
@@ -388,7 +412,13 @@ impl Player {
                 self.set("length", "none");
                 self.cmd(&["loadfile", p, "replace"]);
             }
-            Target::Playlist { device, name, start, length, .. } => {
+            Target::Playlist {
+                device,
+                name,
+                start,
+                length,
+                ..
+            } => {
                 #[cfg(feature = "bluray")]
                 if let Target::Playlist { bd: Some(bd), segs, .. } = &t {
                     if !segs.is_empty() {
@@ -432,7 +462,10 @@ impl Player {
 
     /// kind is "audio" or "sub"; id 0 turns it off.
     pub fn select(&mut self, kind: &str, id: i64) {
-        self.set(if kind == "audio" { "aid" } else { "sid" }, &if id == 0 { "no".to_string() } else { id.to_string() });
+        self.set(
+            if kind == "audio" { "aid" } else { "sid" },
+            &if id == 0 { "no".to_string() } else { id.to_string() },
+        );
         for t in self.st.tracks.iter_mut().filter(|t| t.kind == kind) {
             t.selected = t.id == id;
         }
@@ -455,7 +488,12 @@ impl Player {
                     label.push_str(&part);
                 }
             }
-            v.push(Track { kind, id, label, selected: g("selected") == "yes" });
+            v.push(Track {
+                kind,
+                id,
+                label,
+                selected: g("selected") == "yes",
+            });
         }
         self.st.tracks = v;
     }
@@ -521,10 +559,19 @@ impl Player {
                     return;
                 }
                 let api = CString::new("opengl").unwrap();
-                let mut init = InitParams { get_proc_address: get_proc, ctx: null_mut() };
+                let mut init = InitParams {
+                    get_proc_address: get_proc,
+                    ctx: null_mut(),
+                };
                 let mut ps = [
-                    Param { ty: P_API, data: api.as_ptr() as *mut c_void },
-                    Param { ty: P_INIT, data: &mut init as *mut InitParams as *mut c_void },
+                    Param {
+                        ty: P_API,
+                        data: api.as_ptr() as *mut c_void,
+                    },
+                    Param {
+                        ty: P_INIT,
+                        data: &mut init as *mut InitParams as *mut c_void,
+                    },
                     Param { ty: 0, data: null_mut() },
                 ];
                 let r = (self.api.rc_create)(&mut self.rc, self.h, ps.as_mut_ptr());
@@ -541,14 +588,26 @@ impl Player {
             // egui's framebuffer, to hand back untouched (read before we bind our own)
             let prev = gl.get_parameter_i32(glow::FRAMEBUFFER_BINDING) as u32;
             // (re)create the off-screen target when the area changed size
-            if self.fbo.map_or(true, |(_, _, fw, fh)| fw != w || fh != h) {
+            if self.fbo.is_none_or(|(_, _, fw, fh)| fw != w || fh != h) {
                 if let Some((f, t, _, _)) = self.fbo.take() {
                     gl.delete_framebuffer(f);
                     gl.delete_texture(t);
                 }
-                let (Ok(t), Ok(f)) = (gl.create_texture(), gl.create_framebuffer()) else { return };
+                let (Ok(t), Ok(f)) = (gl.create_texture(), gl.create_framebuffer()) else {
+                    return;
+                };
                 gl.bind_texture(glow::TEXTURE_2D, Some(t));
-                gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::RGBA8 as i32, w, h, 0, glow::RGBA, glow::UNSIGNED_BYTE, glow::PixelUnpackData::Slice(None));
+                gl.tex_image_2d(
+                    glow::TEXTURE_2D,
+                    0,
+                    glow::RGBA8 as i32,
+                    w,
+                    h,
+                    0,
+                    glow::RGBA,
+                    glow::UNSIGNED_BYTE,
+                    glow::PixelUnpackData::Slice(None),
+                );
                 gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
                 gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
                 gl.bind_framebuffer(glow::FRAMEBUFFER, Some(f));
@@ -557,11 +616,22 @@ impl Player {
                 self.fbo = Some((f, t, w, h));
             }
             let (f, _, _, _) = self.fbo.unwrap();
-            let mut fb = FboParam { fbo: f.0.get() as c_int, w, h, internal_format: 0 };
+            let mut fb = FboParam {
+                fbo: f.0.get() as c_int,
+                w,
+                h,
+                internal_format: 0,
+            };
             let mut flip: c_int = 1;
             let mut ps = [
-                Param { ty: P_FBO, data: &mut fb as *mut FboParam as *mut c_void },
-                Param { ty: P_FLIP, data: &mut flip as *mut c_int as *mut c_void },
+                Param {
+                    ty: P_FBO,
+                    data: &mut fb as *mut FboParam as *mut c_void,
+                },
+                Param {
+                    ty: P_FLIP,
+                    data: &mut flip as *mut c_int as *mut c_void,
+                },
                 Param { ty: 0, data: null_mut() },
             ];
             // lets mpv pick up the newest decoded frame; without this it keeps drawing black
@@ -570,7 +640,18 @@ impl Player {
             // copy it to the window, in the spot egui reserved
             gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(f));
             gl.bind_framebuffer(glow::DRAW_FRAMEBUFFER, std::num::NonZeroU32::new(prev).map(glow::NativeFramebuffer));
-            gl.blit_framebuffer(0, 0, w, h, vp.left_px, vp.from_bottom_px, vp.left_px + w, vp.from_bottom_px + h, glow::COLOR_BUFFER_BIT, glow::NEAREST);
+            gl.blit_framebuffer(
+                0,
+                0,
+                w,
+                h,
+                vp.left_px,
+                vp.from_bottom_px,
+                vp.left_px + w,
+                vp.from_bottom_px + h,
+                glow::COLOR_BUFFER_BIT,
+                glow::NEAREST,
+            );
             gl.bind_framebuffer(glow::FRAMEBUFFER, std::num::NonZeroU32::new(prev).map(glow::NativeFramebuffer));
         }
     }

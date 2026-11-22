@@ -22,10 +22,7 @@ impl Bits {
         (self.data.len() * 8) as i64 - self.pos as i64
     }
     fn bit(&mut self) -> u8 {
-        let b = self
-            .data
-            .get(self.pos >> 3)
-            .map_or(0, |&x| (x >> (7 - (self.pos & 7))) & 1);
+        let b = self.data.get(self.pos >> 3).map_or(0, |&x| (x >> (7 - (self.pos & 7))) & 1);
         self.pos += 1;
         b
     }

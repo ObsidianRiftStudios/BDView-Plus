@@ -93,7 +93,11 @@ pub struct Stream {
 
 impl Stream {
     pub fn new(pid: u16, stype: u8) -> Self {
-        let mut s = Stream { pid, stype, ..Default::default() };
+        let mut s = Stream {
+            pid,
+            stype,
+            ..Default::default()
+        };
         if s.is_graphics() {
             s.is_vbr = true;
         }

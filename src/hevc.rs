@@ -42,8 +42,7 @@ pub struct Hevc {
 
 fn st_rps(b: &mut Bits, idx: usize, num: usize, nd: &mut Vec<u32>) {
     let inter = idx != 0 && b.bool();
-    let count;
-    if inter {
+    let count = if inter {
         if idx == num {
             b.skip_ue();
         }
@@ -57,15 +56,15 @@ fn st_rps(b: &mut Bits, idx: usize, num: usize, nd: &mut Vec<u32>) {
                 c += 1;
             }
         }
-        count = c;
+        c
     } else {
         let (neg, pos) = (b.ue(), b.ue());
         for _ in 0..neg + pos {
             b.skip_ue();
             b.skip(1);
         }
-        count = neg + pos;
-    }
+        neg + pos
+    };
     nd.push(count);
 }
 
@@ -188,6 +187,8 @@ fn parse_sps(b: &mut Bits) -> Option<(usize, Sps)> {
     Some((id, s))
 }
 
+// The inner `if` reads bits while testing; moving it into a match guard would hide that side effect.
+#[allow(clippy::collapsible_match)]
 fn parse_sei(h: &mut Hevc, b: &mut Bits) {
     while b.remain() > 24 {
         let (mut t, mut sz) = (0u32, 0usize);
@@ -328,6 +329,8 @@ fn describe(s: &mut Stream, sp: &Sps, h: &Hevc) {
     s.ext_info = e;
 }
 
+// The inner `if` reads bits while testing; moving it into a match guard would hide that side effect.
+#[allow(clippy::collapsible_match)]
 pub fn scan(s: &mut Stream, b: &mut Bits, tag: &mut Tag) {
     let raw = std::mem::take(&mut b.data);
     let mut h = *s.hevc.take().unwrap_or_default();

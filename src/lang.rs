@@ -461,5 +461,6 @@ pub fn language_name(code: &str) -> String {
         "zul" => "Zulu",
         "zun" => "Zuni",
         _ => return code.to_string(),
-    }.to_string()
+    }
+    .to_string()
 }

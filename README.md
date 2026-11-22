@@ -1,8 +1,6 @@
 # TuxInfo
 
-TuxInfo is a Blu-ray / UHD disc analyzer written in Rust. The scanner/CLI are std only; the optional GUI uses egui. It
-reads a Blu-ray `BDMV` folder and prints the same kind of report (playlists, video/audio/subtitle
-streams, per-clip and per-chapter bitrates, stream diagnostics, quick summary).
+TuxInfo is a Blu-ray / UHD disc analyzer written in Rust, inspired by BDInfo. The scanner/CLI are std only; the optional GUI uses egui. It reads a Blu-ray `BDMV` folder and prints a report (playlists, video/audio/subtitle streams, per-clip and per-chapter bitrates, stream diagnostics, quick summary).
 
     cargo build --release
     tuxinfo disc.iso                 # UDF image (ISO)
@@ -13,8 +11,7 @@ streams, per-clip and per-chapter bitrates, stream diagnostics, quick summary).
     tuxinfo --help
 
 ## GUI
-`tuxinfo` with no arguments (or `tuxinfo --gui [path]`) opens a native window (egui/eframe) laid out like the
-classic three-list layout: source box with Browse (folder), Browse ISO, playlist / stream-file / stream lists, log,
+`tuxinfo` with no arguments (or `tuxinfo --gui [path]`) opens a native window (egui/eframe) laid out in a three-list layout: source box with Browse (folder), Browse ISO, playlist / stream-file / stream lists, log,
 progress with time remaining/elapsed, Scan Bitrates (Cancel while running), View Report (copy/save) and
 Settings. A folder, ISO or device can also be dropped onto the window. Native file dialogs use rfd
 (xdg-desktop-portal on Linux).
@@ -64,12 +61,9 @@ LGPL-2.1-or-later (see `LICENSE`). TuxInfo is based on BDInfo by Cinema Squid, c
 Playlists and clip info are not encrypted, but the stream files are, and the scanner has to read them. For every
 Blu-ray and 4K disc (folder, ISO or drive) the program loads an installed **libbluray** at run time (nothing is
 linked) and reads the stream files through it, the same way VLC does. libbluray finds `libaacs`, or MakeMKV's
-`libmmbd` set up as `libaacs` (see the MakeMKV forum thread "Direct Blu-ray playback with VLC"); `libmmbd` in turn
-needs `makemkvcon` reachable. Flatpak MakeMKV is not visible from outside its sandbox, so install MakeMKV from
-source on Linux. If libbluray is not installed the files are read directly, which works for decrypted data only.
+`libmmbd` set up as `libaacs` (see the MakeMKV forum thread "Direct Blu-ray playback with VLC"); `libmmbd` in turn needs `makemkvcon` reachable. Flatpak MakeMKV is not visible from outside its sandbox, so install MakeMKV from source on Linux. If libbluray is not installed the files are read directly, which works for decrypted data only.
 
-- Debian: `apt install libbluray2`; Windows: the `libbluray-2.dll` that ships with VLC is found when it is on the PATH
-  or next to the program. Set `TUXINFO_LIBBLURAY` to a full path to override the search.
+- Debian: `apt install libbluray2`; Windows: the `libbluray-2.dll` that ships with VLC is found when it is on the PATH or next to the program. Set `TUXINFO_LIBBLURAY` to a full path to override the search.
 - `--no-bluray` skips libbluray and reads the files directly.
 - AACS only; BD+ discs may still produce corrupt data (a reported libmmbd problem).
 - Build without it (and without any FFI): `cargo build --release --no-default-features` (add `--features gui` for the window).
