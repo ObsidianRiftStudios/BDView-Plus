@@ -1,0 +1,31 @@
+[package]
+name = "tuxinfo"
+version = "0.2.0"
+edition = "2021"
+description = "TuxInfo: Blu-ray disc analysis tool, LGPL-2.1"
+license = "LGPL-2.1-or-later"
+
+[[bin]]
+name = "tuxinfo"
+path = "src/main.rs"
+
+[features]
+# The command-line tool needs no crates; the native window needs egui.
+default = ["gui", "bluray", "preview"]
+# Decrypt discs through an installed libbluray (loaded at run time; uses MakeMKV's libmmbd if set up for it).
+bluray = []
+gui = ["dep:eframe", "dep:egui_extras", "dep:rfd"]
+# Video preview window through an installed libmpv (loaded at run time; adds almost nothing to the executable).
+preview = ["gui"]
+
+[dependencies]
+eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"], optional = true }
+egui_extras = { version = "0.37.0", optional = true }
+rfd = { version = "0.18.0", default-features = false, features = ["xdg-portal"], optional = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

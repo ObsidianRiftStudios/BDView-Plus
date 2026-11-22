@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TuxInfo
+GenericName=Blu-ray disc analyzer
+Comment=Playlists, streams and bit rates of a Blu-ray or UHD disc
+Exec=@BIN@ --gui
+Icon=tuxinfo
+Terminal=false
+Categories=AudioVideo;Video;Utility;
+StartupWMClass=tuxinfo
