@@ -81,14 +81,14 @@ fn cstr(s: &str) -> Result<CString, String> {
 /// Make libbluray use MakeMKV's libmmbd for AACS/BD+ when it is installed. libbluray tries
 /// libaacs first and only falls back to libmmbd if libaacs is missing, so an installed libaacs
 /// without a key file would otherwise win. libbluray's LIBAACS_PATH / LIBBDPLUS_PATH override the
-/// library name (it appends ".so.0"). Set TUXINFO_NO_MMBD to skip, or LIBAACS_PATH yourself to override.
+/// library name (it appends ".so.0"). Set BDVIEW_PLUS_NO_MMBD to skip, or LIBAACS_PATH yourself to override.
 #[cfg(unix)]
 fn find_mmbd() -> Option<String> {
     use std::env::var_os;
-    if var_os("TUXINFO_NO_MMBD").is_some() {
+    if var_os("BDVIEW_PLUS_NO_MMBD").is_some() {
         return None;
     }
-    let mut dirs: Vec<String> = var_os("TUXINFO_MMBD")
+    let mut dirs: Vec<String> = var_os("BDVIEW_PLUS_MMBD")
         .map(|v| v.to_string_lossy().into_owned())
         .into_iter()
         .collect();
@@ -135,17 +135,17 @@ pub(crate) fn prefer_mmbd() {
     }
 }
 
-/// Load libbluray (override the name with TUXINFO_LIBBLURAY) and open the disc at `path`.
+/// Load libbluray (override the name with BDVIEW_PLUS_LIBBLURAY) and open the disc at `path`.
 pub fn open(path: &Path) -> Result<Arc<Disc>, String> {
     prefer_mmbd();
     unsafe {
-        let mut names: Vec<String> = std::env::var("TUXINFO_LIBBLURAY").into_iter().collect();
+        let mut names: Vec<String> = std::env::var("BDVIEW_PLUS_LIBBLURAY").into_iter().collect();
         names.extend(sys::NAMES.iter().map(|s| s.to_string()));
         let h = names.iter().find_map(|n| {
             let h = sys::load(cstr(n).ok()?.as_ptr());
             (!h.is_null()).then_some(h)
         });
-        let h = h.ok_or("libbluray not found (install libbluray, or set TUXINFO_LIBBLURAY to its path)")?;
+        let h = h.ok_or("libbluray not found (install libbluray, or set BDVIEW_PLUS_LIBBLURAY to its path)")?;
         let get = |n: &str| {
             let p = sys::sym(h, cstr(n).unwrap().as_ptr());
             if p.is_null() {
@@ -158,8 +158,8 @@ pub fn open(path: &Path) -> Result<Arc<Disc>, String> {
         let close = std::mem::transmute::<*mut std::ffi::c_void, CloseFn>(get("bd_close")?);
         let open_file_dec = std::mem::transmute::<*mut std::ffi::c_void, OpenFileDecFn>(get("bd_open_file_dec")?);
         if let Ok(p) = get("bd_set_debug_mask") {
-            // quiet on stderr, unless TUXINFO_TIMING is set: then libbluray prints everything it logs
-            let mask = if std::env::var_os("TUXINFO_TIMING").is_some() {
+            // quiet on stderr, unless BDVIEW_PLUS_TIMING is set: then libbluray prints everything it logs
+            let mask = if std::env::var_os("BDVIEW_PLUS_TIMING").is_some() {
                 0xFFFF_FFFF
             } else {
                 0
@@ -167,7 +167,7 @@ pub fn open(path: &Path) -> Result<Arc<Disc>, String> {
             std::mem::transmute::<*mut std::ffi::c_void, unsafe extern "C" fn(u32)>(p)(mask);
             if mask != 0 {
                 eprintln!(
-                    "tuxinfo: LIBAACS_PATH={:?} LIBBDPLUS_PATH={:?}",
+                    "bdview-plus: LIBAACS_PATH={:?} LIBBDPLUS_PATH={:?}",
                     std::env::var("LIBAACS_PATH").ok(),
                     std::env::var("LIBBDPLUS_PATH").ok()
                 );

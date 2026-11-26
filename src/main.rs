@@ -1,4 +1,4 @@
-//! tuxinfo — Blu-ray disc structure and bitrate analyzer, LGPL-2.1.
+//! bdview-plus — Blu-ray disc structure and bitrate analyzer, LGPL-2.1.
 
 mod app_info;
 mod bits;
@@ -28,7 +28,7 @@ use disc::Disc;
 use std::path::PathBuf;
 use std::time::Instant;
 
-const USAGE: &str = "usage: tuxinfo <BDMV folder | ISO image | disc device (e.g. /dev/sr0)> [options]
+const USAGE: &str = "usage: bdview-plus <BDMV folder | ISO image | disc device (e.g. /dev/sr0)> [options]
   -l, --list         list playlists and exit
   -p, --playlists A,B  only report these playlists (e.g. 00800.MPLS,00801)
   -o, --output PATH  write the report to a file (or into a directory)
@@ -42,7 +42,7 @@ const USAGE: &str = "usage: tuxinfo <BDMV folder | ISO image | disc device (e.g.
       --gui          open the graphical window (default with no arguments)";
 
 fn fail(msg: &str) -> ! {
-    eprintln!("tuxinfo: {msg}");
+    eprintln!("bdview-plus: {msg}");
     std::process::exit(1);
 }
 
@@ -169,7 +169,7 @@ fn main() {
                     .chars()
                     .map(|c| if r#"<>:"/\|?*"#.contains(c) { '_' } else { c })
                     .collect();
-                p.push(format!("TuxInfo.{safe}.txt"));
+                p.push(format!("BDViewPlus.{safe}.txt"));
             }
             if let Some(d) = p.parent().filter(|d| !d.as_os_str().is_empty()) {
                 let _ = std::fs::create_dir_all(d);

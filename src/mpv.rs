@@ -223,9 +223,9 @@ type OpenRo = unsafe extern "C" fn(*mut c_void, *mut c_char, *mut cb::Info) -> c
 
 /// Hardware decoders to try, by the GPUs the system reports (PCI vendor ids under /sys/class/drm).
 /// AMD and Intel decode through VA-API, NVIDIA through NVDEC; the "-copy" forms are the fallback when
-/// the zero-copy route cannot be used with the window's OpenGL context. Override with TUXINFO_HWDEC.
+/// the zero-copy route cannot be used with the window's OpenGL context. Override with BDVIEW_PLUS_HWDEC.
 fn hwdec_list() -> String {
-    if let Ok(v) = std::env::var("TUXINFO_HWDEC") {
+    if let Ok(v) = std::env::var("BDVIEW_PLUS_HWDEC") {
         return v;
     }
     let mut list: Vec<&str> = Vec::new();

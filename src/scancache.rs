@@ -1,5 +1,5 @@
 //! Saved bitrate scans. After a bitrate scan the measurements are written to one file per disc in a
-//! single folder (`<config>/tuxinfo/scans`); opening the same disc again loads them instead of
+//! single folder (`<config>/bdview-plus/scans`); opening the same disc again loads them instead of
 //! reading every stream file. The disc is recognised by a fingerprint of its playlists and stream
 //! file sizes, never by its path, so the same disc from a drive, a folder or an ISO matches.
 
@@ -14,11 +14,7 @@ const MAGIC: &[u8; 4] = b"TXSC";
 const VERSION: u32 = 1;
 
 pub fn dir() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .or_else(|| std::env::var_os("APPDATA"))
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
-    Some(base.join("tuxinfo").join("scans"))
+    Some(crate::app_info::config_dir()?.join("scans"))
 }
 
 // ---- tiny binary codec -------------------------------------------------------------------------
@@ -709,7 +705,7 @@ mod tests {
     /// A disc reopened from its saved scan must report exactly what the fresh scan reported.
     #[test]
     fn saved_scan_reports_the_same() {
-        let tmp = std::env::temp_dir().join(format!("tuxinfo-scancache-test-{}", std::process::id()));
+        let tmp = std::env::temp_dir().join(format!("bdview-plus-scancache-test-{}", std::process::id()));
         std::env::set_var("XDG_CONFIG_HOME", &tmp);
         for path in std::env::var("CACHE_DISCS").unwrap_or("/tmp/pv:/tmp/hvdisc".into()).split(':') {
             let Ok(mut a) = Disc::open(std::path::Path::new(path)) else {

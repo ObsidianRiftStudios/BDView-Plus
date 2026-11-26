@@ -1,11 +1,29 @@
 //! Program identity, repository address and the update check (std only; the check runs `curl`).
 
-/// Home of the TuxInfo repository, e.g. "https://github.com/OWNER/tuxinfo". Empty until it is known.
-pub const REPO_URL: &str = "https://github.com/ObsidianRiftStudios/TuxInfo";
+/// Home of the BDView+ repository.
+pub const REPO_URL: &str = "https://github.com/ObsidianRiftStudios/BDView-Plus";
 
 /// Developer name and support address shown in the About window.
+#[cfg(feature = "gui")]
 pub const STUDIO: &str = "Obsidian Rift Studios";
+#[cfg(feature = "gui")]
 pub const SUPPORT_EMAIL: &str = "support@obsidianrift.net";
+
+#[cfg(feature = "gui")]
+/// The per-user settings folder (`<config>/bdview-plus`). Settings and saved scans from the program's
+/// earlier name (`<config>/tuxinfo`) are moved here the first time it is asked for.
+pub fn config_dir() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .or_else(|| std::env::var_os("APPDATA"))
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+    let dir = base.join("bdview-plus");
+    let old = base.join("tuxinfo");
+    if !dir.exists() && old.is_dir() {
+        let _ = std::fs::rename(&old, &dir);
+    }
+    Some(dir)
+}
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -36,7 +54,7 @@ pub fn check() -> Result<Update, String> {
             "-H",
             "Accept: application/vnd.github+json",
             "-A",
-            "TuxInfo",
+            "BDView+",
             &url,
         ])
         .output()

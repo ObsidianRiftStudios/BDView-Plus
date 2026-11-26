@@ -6,7 +6,7 @@ labels: enhancement
 assignees: ""
 ---
 
-**What would you like TuxInfo to do?**
+**What would you like BDView+ to do?**
 A short description of the feature.
 
 **Why would it help?**

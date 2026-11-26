@@ -491,12 +491,7 @@ impl Default for Settings {
 }
 
 fn cfg_path() -> Option<std::path::PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .or_else(|| std::env::var_os("APPDATA"))
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
-    let new = base.join("tuxinfo").join("settings.txt");
-    Some(new)
+    Some(crate::app_info::config_dir()?.join("settings.txt"))
 }
 
 impl Settings {
@@ -1478,7 +1473,7 @@ impl eframe::App for App {
                     ui.label(RichText::new("(i)").weak())
                         .on_hover_cursor(egui::CursorIcon::Help)
                         .on_hover_text(
-                            "After a bitrate scan finishes, TuxInfo saves the measurements for that disc in the folder below.\n\
+                            "After a bitrate scan finishes, BDView+ saves the measurements for that disc in the folder below.\n\
                      When you open the same disc again (from the drive, a folder or an ISO), they are loaded automatically,\n\
                      so the report and charts are ready without scanning the disc again. The log tells you when this happens.\n\n\
                      Scan Bitrates always measures again and replaces the saved copy. A saved scan is used only if the disc matches\n\
@@ -1570,12 +1565,13 @@ impl eframe::App for App {
             let logo = self
                 .logo
                 .get_or_insert_with(|| {
-                    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../packaging/icons/tuxinfo-256.png")).unwrap_or_default();
+                    let icon =
+                        eframe::icon_data::from_png_bytes(include_bytes!("../packaging/icons/bdview-plus-256.png")).unwrap_or_default();
                     let img = egui::ColorImage::from_rgba_unmultiplied([icon.width as usize, icon.height as usize], &icon.rgba);
-                    ctx.load_texture("tuxinfo-logo", img, egui::TextureOptions::LINEAR)
+                    ctx.load_texture("bdview-plus-logo", img, egui::TextureOptions::LINEAR)
                 })
                 .clone();
-            let open = os_window(&ctx, "about", "About TuxInfo", [540.0, 650.0], |ui| {
+            let open = os_window(&ctx, "about", "About BDView+", [540.0, 650.0], |ui| {
                 let card = |ui: &mut egui::Ui, title: &str, f: &mut dyn FnMut(&mut egui::Ui)| {
                     egui::Frame::new()
                         .fill(ui.visuals().faint_bg_color)
@@ -1597,7 +1593,7 @@ impl eframe::App for App {
                     let text_w = (ui.available_width() - LOGO - PAD - ui.spacing().item_spacing.x * 2.0).max(0.0);
                     ui.allocate_ui_with_layout(egui::vec2(text_w, 0.0), egui::Layout::top_down(egui::Align::Center), |ui| {
                         ui.add_space(10.0);
-                        ui.label(RichText::new("TuxInfo").strong().size(32.0));
+                        ui.label(RichText::new("BDView+").strong().size(32.0));
                         ui.label(RichText::new(format!("Version {}", crate::app_info::version())).size(15.0));
                         ui.label(RichText::new("Blu-ray and Ultra HD disc analyzer").weak());
                         ui.label(RichText::new(format!("by {}", crate::app_info::STUDIO)).weak());
@@ -1616,13 +1612,13 @@ impl eframe::App for App {
                 });
                 ui.add_space(10.0);
                 card(ui, "About", &mut |ui| {
-                    ui.add(egui::Label::new("TuxInfo is based on BDInfo, the Blu-ray disc analyzer by Cinema Squid, continued by the UniqProject developers.").wrap());
+                    ui.add(egui::Label::new("BDView+ is based on BDInfo, the Blu-ray disc analyzer by Cinema Squid, continued by the UniqProject developers.").wrap());
                     ui.hyperlink_to("github.com/UniqProject/BDInfo", "https://github.com/UniqProject/BDInfo");
                 });
                 card(ui, "License", &mut |ui| {
                     ui.add(
                         egui::Label::new(
-                            "BDInfo is licensed under the LGPL-2.1. TuxInfo is a derivative work and is released under the same license.",
+                            "BDInfo is licensed under the LGPL-2.1. BDView+ is a derivative work and is released under the same license.",
                         )
                         .wrap(),
                     );
@@ -1849,7 +1845,7 @@ impl eframe::App for App {
             let (text, name) = (
                 &self.report,
                 format!(
-                    "TuxInfo.{}.txt",
+                    "BDViewPlus.{}.txt",
                     self.src
                         .trim_end_matches(['/', '\\'])
                         .rsplit(['/', '\\'])
@@ -1860,8 +1856,8 @@ impl eframe::App for App {
             ctx.show_viewport_immediate(
                 egui::ViewportId::from_hash_of("report"),
                 egui::ViewportBuilder::default()
-                    .with_title("TuxInfo Report")
-                    .with_app_id("tuxinfo")
+                    .with_title("BDView+ Report")
+                    .with_app_id("bdview-plus")
                     .with_inner_size([900.0, 640.0])
                     .with_min_inner_size([420.0, 260.0]),
                 |ui, _class| {
@@ -2005,7 +2001,7 @@ impl eframe::App for App {
                     egui::ViewportId::from_hash_of(("chart", w.id)),
                     egui::ViewportBuilder::default()
                         .with_title(w.ch.window_title.as_str())
-                        .with_app_id("tuxinfo")
+                        .with_app_id("bdview-plus")
                         .with_inner_size([960.0, 600.0])
                         .with_min_inner_size([420.0, 300.0]),
                     |ui, _class| {
@@ -2109,9 +2105,9 @@ pub fn run(initial: Option<String>) {
     let gone = Arc::new(AtomicBool::new(false));
     let opts = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("TuxInfo")
-            .with_app_id("tuxinfo")
-            .with_icon(eframe::icon_data::from_png_bytes(include_bytes!("../packaging/icons/tuxinfo-256.png")).unwrap_or_default())
+            .with_title("BDView+")
+            .with_app_id("bdview-plus")
+            .with_icon(eframe::icon_data::from_png_bytes(include_bytes!("../packaging/icons/bdview-plus-256.png")).unwrap_or_default())
             .with_inner_size([900.0, 960.0])
             .with_min_inner_size([560.0, 460.0])
             .with_drag_and_drop(true),
@@ -2119,7 +2115,7 @@ pub fn run(initial: Option<String>) {
     };
     let (sh2, cancel2) = (sh.clone(), cancel.clone());
     let r = eframe::run_native(
-        "TuxInfo",
+        "BDView+",
         opts,
         Box::new(move |cc| {
             let ctx = cc.egui_ctx.clone();
@@ -2193,7 +2189,7 @@ pub fn run(initial: Option<String>) {
         }),
     );
     if let Err(e) = r {
-        eprintln!("tuxinfo: cannot start the GUI: {e}");
+        eprintln!("bdview-plus: cannot start the GUI: {e}");
         std::process::exit(1);
     }
 }
@@ -2252,7 +2248,7 @@ pub(crate) fn os_window(ctx: &egui::Context, id: &str, title: &str, size: [f32; 
         egui::ViewportId::from_hash_of(id),
         egui::ViewportBuilder::default()
             .with_title(title)
-            .with_app_id("tuxinfo")
+            .with_app_id("bdview-plus")
             .with_inner_size(size),
         |ctx, _| {
             egui::CentralPanel::default().show(ctx, |ui| f(ui));

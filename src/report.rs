@@ -128,7 +128,7 @@ pub fn generate(disc: &Disc, sel: &[usize], o: &Options) -> String {
             extras.push(n);
         }
     }
-    let version = format!("TuxInfo {}", env!("CARGO_PKG_VERSION"));
+    let version = format!("BDView+ {}", env!("CARGO_PKG_VERSION"));
     let mut info = String::new();
     if let Some(t) = &disc.title {
         let _ = writeln!(info, "{:<16}{}", "Disc Title:", t);
@@ -139,13 +139,13 @@ pub fn generate(disc: &Disc, sel: &[usize], o: &Options) -> String {
     if !extras.is_empty() {
         let _ = writeln!(info, "{:<16}{}", "Extras:", extras.join(", "));
     }
-    let _ = writeln!(info, "{:<16}{}", "TuxInfo:", version);
+    let _ = writeln!(info, "{:<16}{}", "BDView+:", version);
 
     r += &info;
     r += "\n";
     let _ = writeln!(r, "{:<16}", "Notes:");
     if !crate::app_info::REPO_URL.is_empty() {
-        let _ = write!(r, "\nTUXINFO HOME:\n  {}\n\n", crate::app_info::REPO_URL);
+        let _ = write!(r, "\nBDVIEW+ HOME:\n  {}\n\n", crate::app_info::REPO_URL);
     } else {
         r += "\n";
     }

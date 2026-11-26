@@ -15,7 +15,7 @@ A short description of the problem, and what you expected instead.
 3. See ...
 
 **About your setup**
-- TuxInfo version (shown in Help → About, or `tuxinfo --help`):
+- BDView+ version (shown in Help → About, or `bdview-plus --help`):
 - Linux distribution and version:
 - Desktop (KDE, GNOME, ...) and X11 or Wayland:
 - Disc source (disc drive, ISO image, or folder):

@@ -1,12 +1,12 @@
 [package]
-name = "tuxinfo"
+name = "bdview-plus"
 version = "1.0.0"
 edition = "2021"
-description = "TuxInfo: Blu-ray disc analysis tool, LGPL-2.1"
+description = "BDView+: Blu-ray disc analysis tool, LGPL-2.1"
 license = "LGPL-2.1-or-later"
 
 [[bin]]
-name = "tuxinfo"
+name = "bdview-plus"
 path = "src/main.rs"
 
 [features]

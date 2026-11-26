@@ -67,6 +67,7 @@ pub struct Playlist {
     pub has_loops: bool,
     pub initialized: bool,
     /// Built by the user from clips (not read from the disc, and not saved with the scan).
+    #[cfg_attr(not(feature = "gui"), allow(dead_code))]
     pub custom: bool,
     listed: HashSet<u16>,
 }
@@ -262,7 +263,7 @@ fn list_ext(dir: &Node, ext: &str) -> Vec<Node> {
     v
 }
 
-/// TUXINFO_LIST=<file>: write "size path" for every file TuxInfo sees (same layout as
+/// BDVIEW_PLUS_LIST=<file>: write "size path" for every file BDView+ sees (same layout as
 /// `find DIR -type f -printf '%s %P\n' | sort -k2`), to compare against another tool's listing.
 fn list_files(d: &Node, prefix: &str, out: &mut Vec<String>) {
     for c in d.children() {
@@ -647,7 +648,7 @@ impl Disc {
             let (r, l) = vfs::open_udf(input).map_err(|e| format!("{}: {e}", input.display()))?;
             (r, l, input.to_path_buf())
         };
-        if let Some(f) = std::env::var_os("TUXINFO_LIST") {
+        if let Some(f) = std::env::var_os("BDVIEW_PLUS_LIST") {
             let mut v = Vec::new();
             list_files(&root, "", &mut v);
             v.sort_by(|a, b| a.split_once(' ').map(|x| x.1).cmp(&b.split_once(' ').map(|x| x.1)));
@@ -752,15 +753,15 @@ impl Disc {
             .and_then(|f| f.node.clone());
         let Some(probe) = probe else { return };
         let readable = |h: Option<Vec<u8>>| h.is_some_and(|h| !scrambled(&h));
-        // TUXINFO_TIMING=1 prints how long each libbluray step takes (to stderr)
-        let timing = std::env::var_os("TUXINFO_TIMING").is_some();
+        // BDVIEW_PLUS_TIMING=1 prints how long each libbluray step takes (to stderr)
+        let timing = std::env::var_os("BDVIEW_PLUS_TIMING").is_some();
         let t0 = std::time::Instant::now();
         step("AACS handshake with the drive (MakeMKV libmmbd) - this can take 20 seconds or more");
         let opened = open(path);
         step("Checking that the stream files decrypt");
         if timing {
             eprintln!(
-                "tuxinfo: libbluray open: {:.1}s ({})",
+                "bdview-plus: libbluray open: {:.1}s ({})",
                 t0.elapsed().as_secs_f32(),
                 if opened.is_ok() { "ok" } else { "failed" }
             );
@@ -772,7 +773,7 @@ impl Disc {
                 let dec = head_of(&probe.decrypted(&bd));
                 if timing {
                     eprintln!(
-                        "tuxinfo: first decrypted read: {:.1}s ({})",
+                        "bdview-plus: first decrypted read: {:.1}s ({})",
                         t1.elapsed().as_secs_f32(),
                         if dec.is_some() { "ok" } else { "failed" }
                     );
