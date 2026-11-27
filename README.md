@@ -134,6 +134,7 @@ Found a bug or have an idea? Open an [issue](https://github.com/ObsidianRiftStud
 - BDView+ reads Blu-ray and Ultra HD discs, from a drive, an ISO image or a folder. Blu-ray 3D is not supported.
 - Encrypted discs need libbluray, and MakeMKV's library for the protected ones. If libbluray is missing, only
   already-decrypted files can be read.
+- Please respect copyrights. Only use BDView+ on discs you own.
 - The preview needs `libmpv2`. The rest of the program works without it.
 
 ## License and credits
