@@ -31,7 +31,7 @@ BDView+ is written in Rust and is based on [BDInfo](https://github.com/UniqProje
   right away instead of scanning again.
 - **Preview.** Play a playlist, a single clip, or any video file in a built-in player with seeking, volume, and
   audio and subtitle selection.
-- **Encrypted discs.** Reads protected discs through libbluray, with optional MakeMKV support.
+- Integrates with libbluray and MakeMKV to play discs.
 
 ![Bit rate chart](docs/screenshots/bitrate-chart.png)
 
@@ -48,15 +48,6 @@ sudo apt install ./bdview-plus_1.0.0_amd64.deb
 ```
 
 BDView+ then appears in your application menu, or you can start it with `bdview-plus --gui`.
-
-To read discs and play previews you also need:
-
-```
-sudo apt install libbluray2 libmpv2
-```
-
-For protected discs, install [MakeMKV](https://www.makemkv.com/) as well. BDView+ will use its decryption library
-automatically when it finds it.
 
 ## Using the program
 
@@ -132,8 +123,7 @@ Found a bug or have an idea? Open an [issue](https://github.com/ObsidianRiftStud
 ## Good to know
 
 - BDView+ reads Blu-ray and Ultra HD discs, from a drive, an ISO image or a folder. Blu-ray 3D is not supported.
-- Encrypted discs need libbluray, and MakeMKV's library for the protected ones. If libbluray is missing, only
-  already-decrypted files can be read.
+- Integrates with libbluray and MakeMKV's library.
 - Please respect copyrights. Only use BDView+ on discs you own.
 - The preview needs `libmpv2`. The rest of the program works without it.
 
